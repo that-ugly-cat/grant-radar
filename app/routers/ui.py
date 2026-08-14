@@ -190,6 +190,24 @@ def source_create(name: str = Form(...), url: str = Form(""), hints: str = Form(
     return RedirectResponse("/sources", status_code=303)
 
 
+@router.get("/sources/{source_id}/edit", response_class=HTMLResponse)
+def source_edit(request: Request, source_id: int, user=Depends(require_admin)):
+    with get_db() as db:
+        row = db.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
+    if not row:
+        return RedirectResponse("/sources", status_code=303)
+    return _render(request, "source_form.html", source=dict(row))
+
+
+@router.post("/sources/{source_id}/edit")
+def source_update(source_id: int, name: str = Form(...), url: str = Form(""),
+                  hints: str = Form(""), user=Depends(require_admin)):
+    with get_db() as db:
+        db.execute("UPDATE sources SET name=?, url=?, hints=? WHERE id=?",
+                   (name, url or None, hints or None, source_id))
+    return RedirectResponse("/sources", status_code=303)
+
+
 @router.post("/sources/{source_id}/toggle")
 def source_toggle(source_id: int, user=Depends(require_admin)):
     with get_db() as db:

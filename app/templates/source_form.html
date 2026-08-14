@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Edit source</h1>
+  <form method="post" action="/sources/{{ source.id }}/edit" class="grid2">
+    <label>Name * <input name="name" value="{{ source.name }}" required></label>
+    <label>URL <input name="url" value="{{ source.url or '' }}"></label>
+    <label class="span2">Hints <textarea name="hints" rows="4">{{ source.hints or '' }}</textarea></label>
+    <div class="span2 actions">
+      <button type="submit">Save</button>
+      <a class="btn muted" href="/sources">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

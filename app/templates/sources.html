@@ -22,6 +22,7 @@
       <td>{{ '✓' if s.enabled else '—' }}</td>
       {% if user.role == 'admin' %}
       <td class="actions-inline">
+        <a class="btn small muted" href="/sources/{{ s.id }}/edit">edit</a>
         <form method="post" action="/scan-now"><input type="hidden" name="source_id" value="{{ s.id }}"><button class="small" type="submit">scan</button></form>
         <form method="post" action="/sources/{{ s.id }}/toggle"><button class="small" type="submit">{{ 'off' if s.enabled else 'on' }}</button></form>
         <form method="post" action="/sources/{{ s.id }}/delete" onsubmit="return confirm('Delete this source?')"><button class="small danger" type="submit">del</button></form>
