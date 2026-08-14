@@ -1,0 +1,12 @@
+services:
+  grantradar:
+    build: .
+    container_name: grantradar
+    ports:
+      - "127.0.0.1:8015:8015"
+    env_file: .env
+    environment:
+      - GR_DB=/data/grantradar.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

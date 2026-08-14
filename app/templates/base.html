@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Grant Radar{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">📡 Grant Radar</a>
+  {% if user %}
+  <nav>
+    <a href="/">Grants</a>
+    <a href="/proposals">Proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
+    <a href="/sources">Sources</a>
+    {% if user.role == 'admin' %}<a href="/admin">Admin</a>{% endif %}
+    <a class="muted" href="/logout">Logout ({{ user.username }})</a>
+  </nav>
+  {% endif %}
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

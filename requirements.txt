@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+jinja2>=3.1
+python-multipart>=0.0.9
+httpx>=0.27
+anthropic>=0.60
+mcp>=1.9
+PyJWT>=2.8
+APScheduler>=3.10

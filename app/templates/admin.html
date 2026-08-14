@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin</h1>
+
+{% if new_key %}
+<div class="card highlight">
+  <strong>Nuova chiave API (mostrata solo ora, salvala):</strong>
+  <code class="key">{{ new_key }}</code>
+  <p class="small muted">Header: <code>X-API-Key: {{ new_key }}</code> — MCP capability URL: <code>/mcp/k/{{ new_key }}</code></p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Utenti</h2>
+  <table>
+    <thead><tr><th>Username</th><th>Email</th><th>Ruolo</th><th>Attivo</th><th></th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.username }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td>
+        <td>{{ '✓' if u.active else '—' }}</td>
+        <td><form method="post" action="/admin/users/{{ u.id }}/toggle"><button class="small" type="submit">{{ 'disattiva' if u.active else 'riattiva' }}</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h3>Nuovo utente</h3>
+  <form method="post" action="/admin/users/new" class="inline-form">
+    <input name="username" placeholder="username" required>
+    <input name="email" type="email" placeholder="email" required>
+    <input name="password" type="password" placeholder="password" required>
+    <select name="role"><option value="reader">reader</option><option value="admin">admin</option></select>
+    <button type="submit">Crea</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Chiavi API (REST + MCP)</h2>
+  <table>
+    <thead><tr><th>Label</th><th>Chiave</th><th>Creata</th><th>Ultimo uso</th><th>Attiva</th><th></th></tr></thead>
+    <tbody>
+      {% for k in api_keys %}
+      <tr>
+        <td>{{ k.label }}</td>
+        <td><code>{{ k.key[:6] }}…{{ k.key[-4:] }}</code></td>
+        <td class="small">{{ k.created_at }}</td>
+        <td class="small">{{ k.last_used_at or 'mai' }}</td>
+        <td>{{ '✓' if k.active else '—' }}</td>
+        <td>{% if k.active %}<form method="post" action="/admin/keys/{{ k.id }}/revoke" onsubmit="return confirm('Revocare questa chiave?')"><button class="small danger" type="submit">revoca</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h3>Nuova chiave</h3>
+  <form method="post" action="/admin/keys/new" class="inline-form">
+    <input name="label" placeholder="label (es. ono-desktop)" required>
+    <button type="submit">Genera</button>
+  </form>
+</div>
+{% endblock %}

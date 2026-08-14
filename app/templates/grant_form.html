@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>{{ 'Modifica' if grant.id else 'Nuovo' }} grant</h1>
+  <form method="post" action="{{ action }}" class="grid2">
+    <label>Nome * <input name="name" value="{{ grant.name or '' }}" required></label>
+    <label>Funder <input name="funder" value="{{ grant.funder or '' }}"></label>
+    <label class="span2">Scope <textarea name="scope" rows="2">{{ grant.scope or '' }}</textarea></label>
+    <label>Importo max <input name="max_amount" value="{{ grant.max_amount or '' }}"></label>
+    <label>Durata (mesi) <input name="duration_months" value="{{ grant.duration_months or '' }}"></label>
+    <label>Deadline (testo) <input name="deadline" value="{{ grant.deadline or '' }}" placeholder="Rolling, 1 Oct 2026…"></label>
+    <label>Deadline (data) <input name="deadline_date" type="date" value="{{ grant.deadline_date or '' }}"></label>
+    <label class="span2">Ricorrenza <input name="deadline_logic" value="{{ grant.deadline_logic or '' }}" placeholder="annuale, di solito ottobre"></label>
+    <label class="span2">Link <input name="link" value="{{ grant.link or '' }}"></label>
+    <label class="span2">Note <textarea name="notes" rows="2">{{ grant.notes or '' }}</textarea></label>
+    <label>Grant start <input name="grant_start" value="{{ grant.grant_start or '' }}"></label>
+    <label>Tipo
+      <select name="primary_type">
+        <option value=""></option>
+        {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}
+        <option value="{{ t }}" {% if grant.primary_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Actionable
+      <select name="actionable">
+        <option value=""></option>
+        {% for a in ['Yes','Maybe','No'] %}<option value="{{ a }}" {% if grant.actionable == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Status
+      <select name="status">
+        {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if (grant.status or 'open') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="span2 actions">
+      <button type="submit">Salva</button>
+      <a class="btn muted" href="/">Annulla</a>
+    </div>
+  </form>
+  {% if grant.id %}
+  <form method="post" action="/grants/{{ grant.id }}/delete" onsubmit="return confirm('Eliminare definitivamente questo grant e le sue proposals?')">
+    <button class="danger" type="submit">Elimina grant</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

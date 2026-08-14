@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="toolbar">
+  <h1>Sources</h1>
+  {% if user.role == 'admin' %}
+  <div class="filters">
+    <form method="post" action="/scan-now"><button type="submit" title="Scansione LLM di tutte le source attive">📡 Scan now</button></form>
+    <form method="post" action="/check-links-now"><button type="submit" title="Controllo link di tutti i grants">🔗 Check links</button></form>
+  </div>
+  {% endif %}
+</div>
+
+<table>
+  <thead><tr><th>Nome</th><th>URL</th><th>Hints</th><th>Ultimo scan</th><th>Attiva</th>{% if user.role == 'admin' %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+    {% for s in sources %}
+    <tr class="{% if not s.enabled %}row-disabled{% endif %}">
+      <td><strong>{{ s.name }}</strong></td>
+      <td class="small">{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a>{% else %}—{% endif %}</td>
+      <td class="small">{{ s.hints or '—' }}</td>
+      <td class="small">{{ s.last_scanned_at or 'mai' }}</td>
+      <td>{{ '✓' if s.enabled else '—' }}</td>
+      {% if user.role == 'admin' %}
+      <td class="actions-inline">
+        <form method="post" action="/scan-now"><input type="hidden" name="source_id" value="{{ s.id }}"><button class="small" type="submit">scan</button></form>
+        <form method="post" action="/sources/{{ s.id }}/toggle"><button class="small" type="submit">{{ 'off' if s.enabled else 'on' }}</button></form>
+        <form method="post" action="/sources/{{ s.id }}/delete" onsubmit="return confirm('Eliminare questa source?')"><button class="small danger" type="submit">del</button></form>
+      </td>
+      {% endif %}
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">Nessuna source. Aggiungine una: il radar guarda solo dove gli dici di guardare.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if user.role == 'admin' %}
+<div class="card">
+  <h2>Nuova source</h2>
+  <form method="post" action="/sources/new" class="grid2">
+    <label>Nome * <input name="name" required placeholder="SNF"></label>
+    <label>URL <input name="url" placeholder="https://www.snf.ch/en/funding"></label>
+    <label class="span2">Hints <input name="hints" placeholder="bandi bioetica / digital health / AI ethics; ignora le borse per artisti"></label>
+    <div class="span2 actions"><button type="submit">Aggiungi</button></div>
+  </form>
+</div>
+{% endif %}
+
+<h2>Scan log</h2>
+<table>
+  <thead><tr><th>Quando</th><th>Source</th><th>Esito</th><th>Dettaglio</th></tr></thead>
+  <tbody>
+    {% for l in scan_log %}
+    <tr><td class="small">{{ l.started_at }}</td><td>{{ l.source_name or '—' }}</td>
+        <td>{{ l.outcome or 'in corso…' }}</td><td class="small">{{ l.detail or '' }}</td></tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">Nessuno scan eseguito.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

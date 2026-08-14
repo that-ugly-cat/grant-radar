@@ -1,0 +1,118 @@
+"""SQLite layer: connection helper, schema, idempotent init."""
+import os
+import sqlite3
+from contextlib import contextmanager
+
+DB_PATH = os.environ.get("GR_DB", os.path.join(os.path.dirname(__file__), "..", "data", "grantradar.db"))
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS grants (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    funder          TEXT,
+    scope           TEXT,
+    max_amount      TEXT,
+    duration_months TEXT,
+    deadline        TEXT,
+    deadline_date   DATE,
+    deadline_logic  TEXT,
+    link            TEXT,
+    notes           TEXT,
+    grant_start     TEXT,
+    primary_type    TEXT,
+    actionable      TEXT,
+    status          TEXT DEFAULT 'open',
+    origin          TEXT DEFAULT 'manual',
+    last_checked_at DATETIME,
+    link_status     TEXT,
+    content_hash    TEXT,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS proposals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,
+    grant_id    INTEGER REFERENCES grants(id),
+    payload     TEXT,
+    rationale   TEXT,
+    source_url  TEXT,
+    confidence  TEXT,
+    method      TEXT,
+    status      TEXT DEFAULT 'pending',
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    decided_at  DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS sources (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    url             TEXT,
+    hints           TEXT,
+    enabled         BOOLEAN DEFAULT 1,
+    last_scanned_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT UNIQUE NOT NULL,
+    email         TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'reader',
+    active        BOOLEAN DEFAULT 1,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    label        TEXT NOT NULL,
+    key          TEXT UNIQUE NOT NULL,
+    active       BOOLEAN DEFAULT 1,
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS scan_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id   INTEGER REFERENCES sources(id),
+    started_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME,
+    outcome     TEXT,        -- ok | error
+    detail      TEXT
+);
+"""
+
+GRANT_FIELDS = [
+    "name", "funder", "scope", "max_amount", "duration_months", "deadline",
+    "deadline_date", "deadline_logic", "link", "notes", "grant_start",
+    "primary_type", "actionable",
+]
+
+
+def init_db() -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
+    with get_db() as db:
+        db.executescript(SCHEMA)
+
+
+@contextmanager
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def grants_digest() -> list[dict]:
+    """Compact dump of current grants, used by the scanner prompt and /ono/grants."""
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, name, funder, scope, max_amount, duration_months, deadline, "
+            "deadline_date, deadline_logic, link, primary_type, actionable, status "
+            "FROM grants ORDER BY deadline_date IS NULL, deadline_date"
+        ).fetchall()
+    return [dict(r) for r in rows]
