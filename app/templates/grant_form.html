@@ -15,11 +15,11 @@
     <label class="span2">Notes <textarea name="notes" rows="2">{{ grant.notes or '' }}</textarea></label>
     <label>Grant start <input name="grant_start" value="{{ grant.grant_start or '' }}"></label>
     <label>Type
-      <select name="primary_type">
-        <option value=""></option>
-        {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}
-        <option value="{{ t }}" {% if grant.primary_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
-      </select>
+      <input name="primary_type" list="type-options" value="{{ grant.primary_type or '' }}" placeholder="Project, Postdoc, PI…">
+      <datalist id="type-options">
+        {% for t in types %}<option value="{{ t }}">{% endfor %}
+        {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}{% if t not in types %}<option value="{{ t }}">{% endif %}{% endfor %}
+      </datalist>
     </label>
     <label>Status
       <select name="status">

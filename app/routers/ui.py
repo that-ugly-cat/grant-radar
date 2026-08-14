@@ -106,9 +106,16 @@ def grants_page(request: Request, q: str = "", funder: str = "", primary_type: s
     return _render(request, "grants.html", **ctx)
 
 
+def _known_types() -> list[str]:
+    with get_db() as db:
+        return [r["primary_type"] for r in db.execute(
+            "SELECT DISTINCT primary_type FROM grants "
+            "WHERE primary_type IS NOT NULL AND primary_type != '' ORDER BY primary_type")]
+
+
 @router.get("/grants/new", response_class=HTMLResponse)
 def grant_new(request: Request, user=Depends(require_admin)):
-    return _render(request, "grant_form.html", grant={}, action="/grants/new")
+    return _render(request, "grant_form.html", grant={}, action="/grants/new", types=_known_types())
 
 
 @router.post("/grants/new")
@@ -129,7 +136,7 @@ def grant_edit(request: Request, grant_id: int, user=Depends(require_admin)):
         row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
     if not row:
         return RedirectResponse("/grants", status_code=303)
-    return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit")
+    return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit", types=_known_types())
 
 
 @router.post("/grants/{grant_id}/edit")
