@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Login — Grant Radar{% endblock %}
 {% block content %}
-<div class="card narrow">
-  <h1>📡 Grant Radar</h1>
+<div class="login-card">
+  <div class="title"><span style="color: var(--accent)">Grant</span>Radar</div>
+  <div class="sub">The table is private. The radar keeps sweeping either way.</div>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   <form method="post" action="/login">
     <label>Username <input name="username" required autofocus></label>
     <label>Password <input name="password" type="password" required></label>
-    <button type="submit">Entra</button>
+    <div class="actions"><button type="submit">Login</button></div>
   </form>
 </div>
 {% endblock %}

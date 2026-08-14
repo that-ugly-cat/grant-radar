@@ -13,9 +13,11 @@ from ..db import get_db, GRANT_FIELDS
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
 from ..proposals import approve, compute_diff, reject
+from ..version import commit_hash
 
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
+templates.env.globals["commit"] = commit_hash()
 
 
 def _render(request: Request, name: str, **ctx) -> HTMLResponse:
@@ -24,6 +26,13 @@ def _render(request: Request, name: str, **ctx) -> HTMLResponse:
         ctx.setdefault("pending_count", db.execute(
             "SELECT COUNT(*) AS n FROM proposals WHERE status='pending'").fetchone()["n"])
     return templates.TemplateResponse(request, name, ctx)
+
+
+# --- landing (pubblica) ---
+
+@router.get("/", response_class=HTMLResponse)
+def landing(request: Request):
+    return _render(request, "landing.html")
 
 
 # --- auth ---
@@ -42,7 +51,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
             request, "login.html",
             {"error": "Credenziali non valide", "user": None, "pending_count": 0}, status_code=401)
     token = make_token(row["id"], row["username"], row["role"])
-    resp = RedirectResponse("/", status_code=303)
+    resp = RedirectResponse("/grants", status_code=303)
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
     return resp
 
@@ -74,7 +83,7 @@ def _query_grants(q, funder, ptype, actionable, status):
     return [dict(r) for r in rows], funders
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/grants", response_class=HTMLResponse)
 def grants_page(request: Request, q: str = "", funder: str = "", primary_type: str = "",
                 actionable: str = "", status: str = "open", user=Depends(require_user)):
     grants, funders = _query_grants(q, funder, primary_type, actionable, status)
@@ -99,7 +108,7 @@ async def grant_create(request: Request, user=Depends(require_admin)):
             f"INSERT INTO grants ({', '.join(fields)}, status) VALUES ({', '.join('?' * len(fields))}, ?)",
             list(fields.values()) + [form.get("status") or "open"],
         )
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/grants", status_code=303)
 
 
 @router.get("/grants/{grant_id}/edit", response_class=HTMLResponse)
@@ -107,7 +116,7 @@ def grant_edit(request: Request, grant_id: int, user=Depends(require_admin)):
     with get_db() as db:
         row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
     if not row:
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/grants", status_code=303)
     return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit")
 
 
@@ -121,7 +130,7 @@ async def grant_update(request: Request, grant_id: int, user=Depends(require_adm
             f"UPDATE grants SET {sets}, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             list(fields.values()) + [form.get("status") or "open", grant_id],
         )
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/grants", status_code=303)
 
 
 @router.post("/grants/{grant_id}/delete")
@@ -129,7 +138,7 @@ def grant_delete(grant_id: int, user=Depends(require_admin)):
     with get_db() as db:
         db.execute("DELETE FROM proposals WHERE grant_id=?", (grant_id,))
         db.execute("DELETE FROM grants WHERE id=?", (grant_id,))
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/grants", status_code=303)
 
 
 # --- proposals ---

@@ -1,6 +1,9 @@
 services:
   grantradar:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     container_name: grantradar
     ports:
       - "127.0.0.1:8015:8015"

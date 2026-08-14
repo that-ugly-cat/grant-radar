@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="lead">
+Grant Radar tracks funding opportunities for an academic research group — and
+keeps itself current. The table is curated by hand; the radar sweeps the
+funders' sites on its own, once a month, and files what it finds as
+<em>proposals</em>. Nothing written by a machine reaches the table until a
+human has read the diff and clicked approve.
+</p>
+
+<div class="pillars">
+  <div class="pillar">
+    <div class="pillar-icon">✎</div>
+    <div class="pillar-text"><strong>The table stays human</strong>
+    <span>Grants are edited like rows in a spreadsheet: filters, deadlines,
+    one form. Discovery can only propose — approval is a human click on a
+    field-by-field diff, and decided proposals are never deleted: they are
+    the radar's audit log.</span></div>
+  </div>
+  <div class="pillar">
+    <div class="pillar-icon">📡</div>
+    <div class="pillar-text"><strong>The radar sweeps by itself</strong>
+    <span>Every night a link monitor checks each tracked call — dead links and
+    changed pages get flagged. Every month an LLM with live web search walks
+    the configured sources, compares them against the table, and proposes new
+    calls and updated deadlines.</span></div>
+  </div>
+  <div class="pillar">
+    <div class="pillar-icon">⌘</div>
+    <div class="pillar-text"><strong>Agents are users too</strong>
+    <span>An MCP endpoint exposes the table to AI assistants: search grants,
+    list upcoming deadlines, file proposals into the same queue. Same rules as
+    the in-app radar — propose yes, write never.</span></div>
+  </div>
+</div>
+
+<div class="explainers">
+  <details class="explainer">
+    <summary><span class="badge-r plain">plain words</span> Why a radar, and why the machine can't touch the table</summary>
+    <div class="body">
+      <p><strong>The problem.</strong> Every research group keeps a list of
+      funding calls somewhere — a shared spreadsheet, a SharePoint list. And
+      every such list rots the same way: deadlines pass, links die, the call
+      that would have been perfect is discovered three weeks too late, and the
+      person who once kept the list tidy has better things to do. The list
+      doesn't fail loudly; it just quietly stops being true.</p>
+      <p><strong>The fix.</strong> Grant Radar splits the work by what each
+      party is good at. Machines are good at patience: checking every link
+      every night, re-reading funder websites every month, never getting bored.
+      Humans are good at judgment: deciding whether a call is actually worth
+      tracking, whether a deadline change is real, whether a scheme fits the
+      group. So the machine watches and proposes; the human decides. The
+      proposal queue is the boundary between the two — everything automatic
+      stops there, and what crossed it and why stays on record forever.</p>
+      <p><strong>What the AI does and doesn't do.</strong> Once a month, an AI
+      model with live web-search access visits each configured source — a
+      funder's website plus a line of hints about what matters to the group.
+      It compares what it finds against the current table and writes up
+      proposals: a new call, with its amounts and deadlines and a link; or an
+      update, say next year's deadline for a recurring scheme. Each proposal
+      carries its reasoning and the page it came from. What the AI cannot do
+      is write into the table: it has no such button, the same way a smoke
+      detector can't rebuild your kitchen. Someone reads the proposal, sees
+      exactly which fields would change, and approves or rejects it.</p>
+    </div>
+  </details>
+  <details class="explainer">
+    <summary><span class="badge-r geek">geek mode</span> Stack, discovery loop, MCP surface</summary>
+    <div class="body">
+      <p><strong>Stack.</strong> FastAPI + SQLite + HTMX/Jinja2, JWT cookie
+      auth, Docker behind Caddy. Four working tables: <code>grants</code>,
+      <code>proposals</code> (kind new/update/flag, JSON payload, rationale,
+      confidence, method), <code>sources</code>, <code>users</code> — plus
+      <code>scan_log</code>. Decided proposals are never deleted: light audit
+      log by construction.</p>
+      <p><strong>Discovery, two engines.</strong> A nightly link monitor
+      (httpx, no LLM) fetches every tracked link, hashes the readable text,
+      and files <code>flag</code> proposals for dead links and changed pages.
+      A monthly semantic scan runs one agentic loop per source:
+      <code>claude-opus-5</code> with the server-side
+      <code>web_search</code> tool, plus a strict-schema client tool
+      <code>submit_proposals</code> the model must call exactly once — schema
+      validation happens at the tool-call layer, and structured outputs stay
+      compatible with web search. The prompt carries the current grants digest
+      so the model distinguishes <em>new</em> from <em>update</em>;
+      <code>pause_turn</code> is handled; a wrong proposal costs one human
+      click, not one corrupted row.</p>
+      <p><strong>MCP.</strong> Streamable HTTP (stateless) mounted at
+      <code>/mcp</code>, six tools: <code>search_grants</code>,
+      <code>get_grant</code>, <code>upcoming_deadlines</code>,
+      <code>list_proposals</code>, <code>propose_grant</code>,
+      <code>propose_update</code>. Auth via <code>X-API-Key</code> header or —
+      for clients that can't send headers — a capability URL
+      <code>/mcp/k/{key}</code>: a middleware validates the key against the
+      same revocable table and rewrites the path, so the MCP app itself stays
+      auth-unaware. Approval is deliberately absent from every API surface:
+      it exists only as a button in this UI. REST for scripts:
+      <code>GET /ono/grants</code>, a compact dump optimized for LLM context
+      windows.</p>
+    </div>
+  </details>
+</div>
+
+<div class="cta">
+  {% if user %}<a class="btn" href="/grants">Open the table →</a>
+  {% else %}<a class="btn" href="/login">Login →</a>{% endif %}
+</div>
+{% endblock %}

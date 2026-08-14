@@ -3,25 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Grant Radar{% endblock %}</title>
+  <title>{% block title %}Grant Radar — grantradar.borant.eu{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
 <header>
-  <a class="brand" href="/">📡 Grant Radar</a>
-  {% if user %}
+  <div class="brand"><a href="/"><span>Grant</span>Radar</a></div>
+  <span class="tagline-top">a funding table that watches the horizon by itself</span>
   <nav>
-    <a href="/">Grants</a>
-    <a href="/proposals">Proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
-    <a href="/sources">Sources</a>
-    {% if user.role == 'admin' %}<a href="/admin">Admin</a>{% endif %}
-    <a class="muted" href="/logout">Logout ({{ user.username }})</a>
+    {% if user %}
+      <a href="/grants">grants</a>
+      <a href="/proposals">proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
+      <a href="/sources">sources</a>
+      {% if user.role == 'admin' %}<a href="/admin">admin</a>{% endif %}
+      <a href="/logout">logout ({{ user.username }})</a>
+    {% else %}
+      <a href="/login">login</a>
+    {% endif %}
   </nav>
-  {% endif %}
 </header>
 <main>
 {% block content %}{% endblock %}
 </main>
+<footer>
+  what you read here is what runs — deployed commit <code>{{ commit }}</code><br>
+  source: <a href="https://github.com/that-ugly-cat/grant-radar">github.com/that-ugly-cat/grant-radar</a>
+  · discovery by <a href="https://www.anthropic.com">Claude</a> with server-side web search,
+  approval by humans · a <a href="https://borant.eu">borant</a> tool
+</footer>
 </body>
 </html>
