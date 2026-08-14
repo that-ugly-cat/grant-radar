@@ -37,8 +37,9 @@ def search_grants(
     primary_type: str = "",
     status: str = "open",
 ) -> str:
-    """Search tracked grants. q matches name/scope/notes (substring); funder and
-    primary_type (Project|Postdoc|PI|Network|PhD|Other) filter exactly.
+    """Search tracked grants. q matches name/scope/notes (substring); funder
+    filters exactly; primary_type filters exactly (e.g. Project, Postdoc, PI,
+    Network, PhD, Other) or pass 'none' to match grants with no type set.
     status is deadline-aware: 'open' = status open AND deadline in the future
     or absent; 'expired' = status open but deadline passed; 'closed'/'archived'
     = manual states; '' = any. Returns a JSON list sorted by next deadline."""
@@ -47,10 +48,14 @@ def search_grants(
     if q:
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ?)"
         args += [f"%{q}%"] * 3
-    for col, val in (("funder", funder), ("primary_type", primary_type)):
-        if val:
-            sql += f" AND {col} = ?"
-            args.append(val)
+    if funder:
+        sql += " AND funder = ?"
+        args.append(funder)
+    if primary_type == "none":
+        sql += " AND (primary_type IS NULL OR primary_type = '')"
+    elif primary_type:
+        sql += " AND primary_type = ?"
+        args.append(primary_type)
     cond, cond_args = status_condition(status)
     sql += cond
     args += cond_args

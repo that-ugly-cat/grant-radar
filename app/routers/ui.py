@@ -72,10 +72,14 @@ def _query_grants(q, funder, ptype, status):
     if q:
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ? OR funder LIKE ?)"
         args += [f"%{q}%"] * 4
-    for col, val in (("funder", funder), ("primary_type", ptype)):
-        if val:
-            sql += f" AND {col} = ?"
-            args.append(val)
+    if funder:
+        sql += " AND funder = ?"
+        args.append(funder)
+    if ptype == "__none__":
+        sql += " AND (primary_type IS NULL OR primary_type = '')"
+    elif ptype:
+        sql += " AND primary_type = ?"
+        args.append(ptype)
     cond, cond_args = status_condition(status)
     sql += cond
     args += cond_args
@@ -84,14 +88,16 @@ def _query_grants(q, funder, ptype, status):
         rows = db.execute(sql, args).fetchall()
         funders = [r["funder"] for r in db.execute(
             "SELECT DISTINCT funder FROM grants WHERE funder IS NOT NULL AND funder != '' ORDER BY funder")]
-    return [dict(r) for r in rows], funders
+        types = [r["primary_type"] for r in db.execute(
+            "SELECT DISTINCT primary_type FROM grants WHERE primary_type IS NOT NULL AND primary_type != '' ORDER BY primary_type")]
+    return [dict(r) for r in rows], funders, types
 
 
 @router.get("/grants", response_class=HTMLResponse)
 def grants_page(request: Request, q: str = "", funder: str = "", primary_type: str = "",
                 status: str = "open", user=Depends(require_user)):
-    grants, funders = _query_grants(q, funder, primary_type, status)
-    ctx = {"grants": grants, "funders": funders, "q": q, "f_funder": funder,
+    grants, funders, types = _query_grants(q, funder, primary_type, status)
+    ctx = {"grants": grants, "funders": funders, "types": types, "q": q, "f_funder": funder,
            "f_type": primary_type, "f_status": status,
            "today": date.today().isoformat()}
 

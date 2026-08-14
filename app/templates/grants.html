@@ -9,8 +9,9 @@
     </select>
     <select name="primary_type" hx-get="/grants" hx-target="#grants-table">
       <option value="">Type: all</option>
-      {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}
+      {% for t in types %}
       <option value="{{ t }}" {% if t == f_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      <option value="__none__" {% if f_type == '__none__' %}selected{% endif %}>(no type)</option>
     </select>
     <select name="status" hx-get="/grants" hx-target="#grants-table">
       {% for s in ['open','expired','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
