@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS grants (
     status          TEXT DEFAULT 'open',
     origin          TEXT DEFAULT 'manual',
     last_checked_at DATETIME,
+    last_verified_at DATETIME,
     link_status     TEXT,
     content_hash    TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -104,6 +105,9 @@ def init_db() -> None:
         pcols = [r["name"] for r in db.execute("PRAGMA table_info(proposals)")]
         if "source_id" not in pcols:
             db.execute("ALTER TABLE proposals ADD COLUMN source_id INTEGER REFERENCES sources(id) ON DELETE SET NULL")
+        # Migrazione 2026-08-14 (3): timestamp dell'ultima verifica LLM per-grant.
+        if "last_verified_at" not in cols:
+            db.execute("ALTER TABLE grants ADD COLUMN last_verified_at DATETIME")
 
 
 @contextmanager

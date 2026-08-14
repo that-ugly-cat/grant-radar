@@ -13,6 +13,7 @@ from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
 from ..db import get_db, status_condition, GRANT_FIELDS
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
+from ..discovery.verifier import verify_grant
 from ..proposals import approve, compute_diff, reject
 from ..version import commit_hash
 
@@ -181,6 +182,12 @@ async def grant_update(request: Request, grant_id: int, user=Depends(require_adm
             list(fields.values()) + [_form_source_id(form), form.get("status") or "open", grant_id],
         )
     return RedirectResponse("/grants", status_code=303)
+
+
+@router.post("/grants/{grant_id}/check")
+def grant_check(grant_id: int, user=Depends(require_admin)):
+    threading.Thread(target=verify_grant, args=(grant_id,), daemon=True).start()
+    return RedirectResponse("/grants?checked=1", status_code=303)
 
 
 @router.post("/grants/{grant_id}/delete")

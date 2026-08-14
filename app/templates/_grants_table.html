@@ -22,7 +22,10 @@
       </td>
       <td>{{ g.primary_type or '—' }}</td>
       <td>{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">↗{% if g.link_status == 'dead' %}💀{% endif %}</a>{% else %}—{% endif %}</td>
-      {% if user.role == 'admin' %}<td><a class="small" href="/grants/{{ g.id }}/edit">edit</a></td>{% endif %}
+      {% if user.role == 'admin' %}<td class="actions-inline">
+        <a class="btn small muted" href="/grants/{{ g.id }}/edit">edit</a>
+        <form method="post" action="/grants/{{ g.id }}/check"><button class="small" type="submit" title="LLM check: fetch the page, compare, file a diff proposal if needed">check</button></form>
+      </td>{% endif %}
     </tr>
     {% else %}
     <tr><td colspan="8" class="muted">No grants found.</td></tr>

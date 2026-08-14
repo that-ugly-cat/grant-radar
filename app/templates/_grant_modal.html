@@ -22,10 +22,14 @@
       <tr><th>Notes</th><td>{{ g.notes or '—' }}</td></tr>
       <tr><th>Source</th><td>{{ g.source_name or '—' }}</td></tr>
       <tr><th>Origin</th><td>{{ g.origin }}{% if g.last_checked_at %} · link checked {{ g.last_checked_at }} ({{ g.link_status or '?' }}){% endif %}</td></tr>
+      <tr><th>LLM check</th><td class="small">{{ g.last_verified_at or 'never' }}</td></tr>
       <tr><th>Record</th><td class="small muted">created {{ g.created_at }} · updated {{ g.updated_at }}</td></tr>
     </table>
     {% if user.role == 'admin' %}
-    <div class="actions"><a class="btn" href="/grants/{{ g.id }}/edit">Edit</a></div>
+    <div class="actions">
+      <a class="btn" href="/grants/{{ g.id }}/edit">Edit</a>
+      <form method="post" action="/grants/{{ g.id }}/check"><button type="submit" title="Fetch the page, compare with the record, file a diff proposal if needed">Check now</button></form>
+    </div>
     {% endif %}
   </div>
 </div>

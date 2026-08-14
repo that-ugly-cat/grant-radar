@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+{% if request.query_params.get('checked') %}
+<div class="card highlight small">Check started — takes a minute or two. Differences land in
+  <a href="/proposals">Proposals</a>; if everything matches, the grant gets a "LLM check" timestamp (see its detail).</div>
+{% endif %}
 <div class="toolbar">
   <form class="filters" hx-get="/grants" hx-target="#grants-table" hx-push-url="true"
         hx-trigger="change, keyup changed delay:400ms from:input">
