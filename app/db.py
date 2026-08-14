@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS grants (
     notes           TEXT,
     grant_start     TEXT,
     primary_type    TEXT,
-    actionable      TEXT,
     status          TEXT DEFAULT 'open',
     origin          TEXT DEFAULT 'manual',
     last_checked_at DATETIME,
@@ -85,7 +84,7 @@ CREATE TABLE IF NOT EXISTS scan_log (
 GRANT_FIELDS = [
     "name", "funder", "scope", "max_amount", "duration_months", "deadline",
     "deadline_date", "deadline_logic", "link", "notes", "grant_start",
-    "primary_type", "actionable",
+    "primary_type",
 ]
 
 
@@ -93,6 +92,10 @@ def init_db() -> None:
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     with get_db() as db:
         db.executescript(SCHEMA)
+        # Migrazione 2026-08-14: rimossa la colonna actionable.
+        cols = [r["name"] for r in db.execute("PRAGMA table_info(grants)")]
+        if "actionable" in cols:
+            db.execute("ALTER TABLE grants DROP COLUMN actionable")
 
 
 @contextmanager
@@ -125,7 +128,7 @@ def grants_digest() -> list[dict]:
     with get_db() as db:
         rows = db.execute(
             "SELECT id, name, funder, scope, max_amount, duration_months, deadline, "
-            "deadline_date, deadline_logic, link, primary_type, actionable, status "
+            "deadline_date, deadline_logic, link, primary_type, status "
             "FROM grants ORDER BY deadline_date IS NULL, deadline_date"
         ).fetchall()
     return [dict(r) for r in rows]

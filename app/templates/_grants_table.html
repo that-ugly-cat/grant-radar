@@ -2,7 +2,7 @@
   <thead>
     <tr>
       <th>Grant</th><th>Funder</th><th>Scope</th><th>Max</th><th>Deadline</th>
-      <th>Type</th><th>Act.</th><th>Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
+      <th>Type</th><th>Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
     </tr>
   </thead>
   <tbody>
@@ -19,12 +19,11 @@
         {% if g.deadline_logic %}<div class="muted small">{{ g.deadline_logic }}</div>{% endif %}
       </td>
       <td>{{ g.primary_type or '—' }}</td>
-      <td>{{ g.actionable or '—' }}</td>
       <td>{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">↗{% if g.link_status == 'dead' %}💀{% endif %}</a>{% else %}—{% endif %}</td>
       {% if user.role == 'admin' %}<td><a class="small" href="/grants/{{ g.id }}/edit">edit</a></td>{% endif %}
     </tr>
     {% else %}
-    <tr><td colspan="9" class="muted">No grants found.</td></tr>
+    <tr><td colspan="8" class="muted">No grants found.</td></tr>
     {% endfor %}
   </tbody>
 </table>

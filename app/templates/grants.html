@@ -12,10 +12,6 @@
       {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}
       <option value="{{ t }}" {% if t == f_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
     </select>
-    <select name="actionable" hx-get="/grants" hx-target="#grants-table">
-      <option value="">Actionable: all</option>
-      {% for a in ['Yes','Maybe','No'] %}<option value="{{ a }}" {% if a == f_actionable %}selected{% endif %}>{{ a }}</option>{% endfor %}
-    </select>
     <select name="status" hx-get="/grants" hx-target="#grants-table">
       {% for s in ['open','expired','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
       <option value="" {% if not f_status %}selected{% endif %}>all</option>

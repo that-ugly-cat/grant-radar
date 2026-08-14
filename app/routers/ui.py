@@ -66,13 +66,13 @@ def logout():
 
 # --- grants ---
 
-def _query_grants(q, funder, ptype, actionable, status):
+def _query_grants(q, funder, ptype, status):
     sql = "SELECT * FROM grants WHERE 1=1"
     args: list = []
     if q:
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ? OR funder LIKE ?)"
         args += [f"%{q}%"] * 4
-    for col, val in (("funder", funder), ("primary_type", ptype), ("actionable", actionable)):
+    for col, val in (("funder", funder), ("primary_type", ptype)):
         if val:
             sql += f" AND {col} = ?"
             args.append(val)
@@ -89,10 +89,10 @@ def _query_grants(q, funder, ptype, actionable, status):
 
 @router.get("/grants", response_class=HTMLResponse)
 def grants_page(request: Request, q: str = "", funder: str = "", primary_type: str = "",
-                actionable: str = "", status: str = "open", user=Depends(require_user)):
-    grants, funders = _query_grants(q, funder, primary_type, actionable, status)
+                status: str = "open", user=Depends(require_user)):
+    grants, funders = _query_grants(q, funder, primary_type, status)
     ctx = {"grants": grants, "funders": funders, "q": q, "f_funder": funder,
-           "f_type": primary_type, "f_actionable": actionable, "f_status": status,
+           "f_type": primary_type, "f_status": status,
            "today": date.today().isoformat()}
 
     if request.headers.get("HX-Request"):

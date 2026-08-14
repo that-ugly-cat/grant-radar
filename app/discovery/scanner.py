@@ -16,7 +16,7 @@ MAX_WEB_SEARCHES = 12
 
 # Structured proposals arrive via a strict client tool: web search + strict tool
 # use are compatible, and validation happens at the tool-call layer.
-_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS if f != "actionable"}
+_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS}
 
 SUBMIT_TOOL = {
     "name": "submit_proposals",

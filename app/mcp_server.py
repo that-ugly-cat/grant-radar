@@ -35,22 +35,19 @@ def search_grants(
     q: str = "",
     funder: str = "",
     primary_type: str = "",
-    actionable: str = "",
     status: str = "open",
 ) -> str:
-    """Search tracked grants. q matches name/scope/notes (substring); funder,
-    primary_type (Project|Postdoc|PI|Network|PhD|Other) and actionable
-    (Yes|No|Maybe) filter exactly. status is deadline-aware: 'open' = status
-    open AND deadline in the future or absent; 'expired' = status open but
-    deadline passed; 'closed'/'archived' = manual states; '' = any.
-    Returns a JSON list sorted by next deadline."""
+    """Search tracked grants. q matches name/scope/notes (substring); funder and
+    primary_type (Project|Postdoc|PI|Network|PhD|Other) filter exactly.
+    status is deadline-aware: 'open' = status open AND deadline in the future
+    or absent; 'expired' = status open but deadline passed; 'closed'/'archived'
+    = manual states; '' = any. Returns a JSON list sorted by next deadline."""
     sql = "SELECT * FROM grants WHERE 1=1"
     args: list = []
     if q:
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ?)"
         args += [f"%{q}%"] * 3
-    for col, val in (("funder", funder), ("primary_type", primary_type),
-                     ("actionable", actionable)):
+    for col, val in (("funder", funder), ("primary_type", primary_type)):
         if val:
             sql += f" AND {col} = ?"
             args.append(val)
@@ -72,20 +69,16 @@ def get_grant(grant_id: int) -> str:
 
 
 @mcp.tool()
-def upcoming_deadlines(days: int = 90, only_actionable: bool = True) -> str:
-    """Open grants with a deadline within the next `days` days, soonest first.
-    only_actionable=True restricts to actionable in (Yes, Maybe)."""
+def upcoming_deadlines(days: int = 90) -> str:
+    """Open grants with a deadline within the next `days` days, soonest first."""
     sql = (
-        "SELECT id, name, funder, deadline, deadline_date, primary_type, actionable, link "
+        "SELECT id, name, funder, deadline, deadline_date, primary_type, link "
         "FROM grants WHERE status='open' AND deadline_date IS NOT NULL "
-        "AND deadline_date >= date('now') AND deadline_date <= date('now', ?)"
+        "AND deadline_date >= date('now') AND deadline_date <= date('now', ?) "
+        "ORDER BY deadline_date"
     )
-    args: list = [f"+{int(days)} days"]
-    if only_actionable:
-        sql += " AND actionable IN ('Yes', 'Maybe')"
-    sql += " ORDER BY deadline_date"
     with get_db() as db:
-        rows = db.execute(sql, args).fetchall()
+        rows = db.execute(sql, [f"+{int(days)} days"]).fetchall()
     return json.dumps([dict(r) for r in rows], ensure_ascii=False, default=str)
 
 
@@ -120,7 +113,7 @@ def propose_grant(fields: dict, rationale: str, source_url: str = "", confidence
     """Propose a NEW grant for the queue (needs human approval in the UI).
     fields: subset of {name, funder, scope, max_amount, duration_months, deadline,
     deadline_date (YYYY-MM-DD), deadline_logic, link, notes, grant_start,
-    primary_type, actionable}. name is required."""
+    primary_type}. name is required."""
     if not fields.get("name"):
         return json.dumps({"ok": False, "error": "fields.name is required"})
     pid = _insert_proposal("new", None, fields, rationale, source_url, confidence)

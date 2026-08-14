@@ -21,12 +21,6 @@
         <option value="{{ t }}" {% if grant.primary_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
       </select>
     </label>
-    <label>Actionable
-      <select name="actionable">
-        <option value=""></option>
-        {% for a in ['Yes','Maybe','No'] %}<option value="{{ a }}" {% if grant.actionable == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
-      </select>
-    </label>
     <label>Status
       <select name="status">
         {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if (grant.status or 'open') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
