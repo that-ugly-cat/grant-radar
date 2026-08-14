@@ -130,6 +130,16 @@ async def grant_create(request: Request, user=Depends(require_admin)):
     return RedirectResponse("/grants", status_code=303)
 
 
+@router.get("/grants/{grant_id}/detail", response_class=HTMLResponse)
+def grant_detail(request: Request, grant_id: int, user=Depends(require_user)):
+    with get_db() as db:
+        row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
+    if not row:
+        return HTMLResponse("")
+    return templates.TemplateResponse(request, "_grant_modal.html",
+                                      {"g": dict(row), "user": user, "today": date.today().isoformat()})
+
+
 @router.get("/grants/{grant_id}/edit", response_class=HTMLResponse)
 def grant_edit(request: Request, grant_id: int, user=Depends(require_admin)):
     with get_db() as db:

@@ -1,0 +1,30 @@
+<div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = ''">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>{{ g.name }}{% if g.origin == 'discovery' %} <span class="chip" title="Found by discovery">📡</span>{% endif %}</h2>
+      <button class="modal-close" onclick="document.getElementById('modal').innerHTML = ''" aria-label="Close">✕</button>
+    </div>
+    <table class="detail">
+      <tr><th>Funder</th><td>{{ g.funder or '—' }}</td></tr>
+      <tr><th>Scope</th><td>{{ g.scope or '—' }}</td></tr>
+      <tr><th>Max amount</th><td>{{ g.max_amount or '—' }}</td></tr>
+      <tr><th>Duration</th><td>{{ g.duration_months or '—' }}{% if g.duration_months %} months{% endif %}</td></tr>
+      <tr><th>Deadline</th><td>
+        {% if g.deadline_date %}<span class="{% if g.deadline_date < today %}deadline-past{% endif %}">{{ g.deadline_date }}</span>{% endif %}
+        {% if g.deadline %}{% if g.deadline_date %} · {% endif %}{{ g.deadline }}{% endif %}
+        {% if not g.deadline_date and not g.deadline %}—{% endif %}
+      </td></tr>
+      <tr><th>Recurrence</th><td>{{ g.deadline_logic or '—' }}</td></tr>
+      <tr><th>Grant start</th><td>{{ g.grant_start or '—' }}</td></tr>
+      <tr><th>Type</th><td>{{ g.primary_type or '—' }}</td></tr>
+      <tr><th>Status</th><td>{{ g.status }}{% if g.status == 'open' and g.deadline_date and g.deadline_date < today %} <span class="chip conf-low">expired</span>{% endif %}</td></tr>
+      <tr><th>Link</th><td>{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">{{ g.link }}</a>{% if g.link_status == 'dead' %} 💀{% endif %}{% else %}—{% endif %}</td></tr>
+      <tr><th>Notes</th><td>{{ g.notes or '—' }}</td></tr>
+      <tr><th>Origin</th><td>{{ g.origin }}{% if g.last_checked_at %} · link checked {{ g.last_checked_at }} ({{ g.link_status or '?' }}){% endif %}</td></tr>
+      <tr><th>Record</th><td class="small muted">created {{ g.created_at }} · updated {{ g.updated_at }}</td></tr>
+    </table>
+    {% if user.role == 'admin' %}
+    <div class="actions"><a class="btn" href="/grants/{{ g.id }}/edit">Edit</a></div>
+    {% endif %}
+  </div>
+</div>

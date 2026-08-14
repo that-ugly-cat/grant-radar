@@ -53,6 +53,30 @@ th { color: var(--faint); font-weight: 700; font-size: 0.7rem; text-transform: u
 tr:hover td { background: var(--card); }
 tr.row-dead td { background: var(--danger-bg); }
 .deadline-past { color: var(--danger); font-weight: 600; }
+tr.row-click { cursor: pointer; }
+
+/* modal */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(5, 7, 12, 0.65);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 4rem 1rem 2rem; overflow-y: auto;
+}
+.modal-card {
+  background: var(--card); border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 1.2rem 1.5rem 1.4rem; max-width: 44rem; width: 100%;
+}
+.modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.modal-head h2 { margin: 0 0 0.6rem; }
+.modal-close {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 6px; padding: 0.15rem 0.55rem; font-size: 0.9rem;
+}
+.modal-close:hover { background: var(--card-hover); color: var(--fg); }
+table.detail { margin: 0.4rem 0 0; }
+table.detail th { width: 8.5rem; color: var(--faint); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; vertical-align: top; }
+table.detail td { color: var(--label); }
+table.detail tr:hover td { background: transparent; }
 tr.row-disabled td { opacity: 0.45; }
 
 /* forms & buttons */

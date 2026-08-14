@@ -7,7 +7,9 @@
   </thead>
   <tbody>
     {% for g in grants %}
-    <tr class="{% if g.link_status == 'dead' %}row-dead{% endif %}">
+    <tr class="row-click {% if g.link_status == 'dead' %}row-dead{% endif %}"
+        hx-get="/grants/{{ g.id }}/detail" hx-target="#modal"
+        hx-trigger="click[!event.target.closest('a') && !event.target.closest('button')]">
       <td><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Found by discovery">📡</span>{% endif %}
         {% if g.notes %}<div class="muted small">{{ g.notes }}</div>{% endif %}</td>
       <td>{{ g.funder or '—' }}</td>
