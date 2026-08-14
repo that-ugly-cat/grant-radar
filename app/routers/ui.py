@@ -66,40 +66,46 @@ def logout():
 
 # --- grants ---
 
-def _query_grants(q, funder, ptype, status):
-    sql = "SELECT * FROM grants WHERE 1=1"
+def _query_grants(q, funder, ptype, source, status):
+    sql = "SELECT g.*, s.name AS source_name FROM grants g LEFT JOIN sources s ON s.id = g.source_id WHERE 1=1"
     args: list = []
     if q:
-        sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ? OR funder LIKE ?)"
+        sql += " AND (g.name LIKE ? OR g.scope LIKE ? OR g.notes LIKE ? OR g.funder LIKE ?)"
         args += [f"%{q}%"] * 4
     if funder:
-        sql += " AND funder = ?"
+        sql += " AND g.funder = ?"
         args.append(funder)
     if ptype == "__none__":
-        sql += " AND (primary_type IS NULL OR primary_type = '')"
+        sql += " AND (g.primary_type IS NULL OR g.primary_type = '')"
     elif ptype:
-        sql += " AND primary_type = ?"
+        sql += " AND g.primary_type = ?"
         args.append(ptype)
-    cond, cond_args = status_condition(status)
+    if source == "__none__":
+        sql += " AND g.source_id IS NULL"
+    elif source:
+        sql += " AND g.source_id = ?"
+        args.append(int(source))
+    cond, cond_args = status_condition(status, prefix="g.")
     sql += cond
     args += cond_args
-    sql += " ORDER BY deadline_date IS NULL, deadline_date"
+    sql += " ORDER BY g.deadline_date IS NULL, g.deadline_date"
     with get_db() as db:
         rows = db.execute(sql, args).fetchall()
         funders = [r["funder"] for r in db.execute(
             "SELECT DISTINCT funder FROM grants WHERE funder IS NOT NULL AND funder != '' ORDER BY funder")]
         types = [r["primary_type"] for r in db.execute(
             "SELECT DISTINCT primary_type FROM grants WHERE primary_type IS NOT NULL AND primary_type != '' ORDER BY primary_type")]
-    return [dict(r) for r in rows], funders, types
+        sources = [dict(r) for r in db.execute("SELECT id, name FROM sources ORDER BY name")]
+    return [dict(r) for r in rows], funders, types, sources
 
 
 @router.get("/grants", response_class=HTMLResponse)
 def grants_page(request: Request, q: str = "", funder: str = "", primary_type: str = "",
-                status: str = "open", user=Depends(require_user)):
-    grants, funders, types = _query_grants(q, funder, primary_type, status)
-    ctx = {"grants": grants, "funders": funders, "types": types, "q": q, "f_funder": funder,
-           "f_type": primary_type, "f_status": status,
-           "today": date.today().isoformat()}
+                source: str = "", status: str = "open", user=Depends(require_user)):
+    grants, funders, types, sources = _query_grants(q, funder, primary_type, source, status)
+    ctx = {"grants": grants, "funders": funders, "types": types, "sources": sources,
+           "q": q, "f_funder": funder, "f_type": primary_type, "f_source": source,
+           "f_status": status, "today": date.today().isoformat()}
 
     if request.headers.get("HX-Request"):
         return _render(request, "_grants_table.html", **ctx)
@@ -113,9 +119,20 @@ def _known_types() -> list[str]:
             "WHERE primary_type IS NOT NULL AND primary_type != '' ORDER BY primary_type")]
 
 
+def _all_sources() -> list[dict]:
+    with get_db() as db:
+        return [dict(r) for r in db.execute("SELECT id, name FROM sources ORDER BY name")]
+
+
+def _form_source_id(form) -> int | None:
+    raw = form.get("source_id") or ""
+    return int(raw) if raw.isdigit() else None
+
+
 @router.get("/grants/new", response_class=HTMLResponse)
 def grant_new(request: Request, user=Depends(require_admin)):
-    return _render(request, "grant_form.html", grant={}, action="/grants/new", types=_known_types())
+    return _render(request, "grant_form.html", grant={}, action="/grants/new",
+                   types=_known_types(), sources=_all_sources())
 
 
 @router.post("/grants/new")
@@ -124,8 +141,9 @@ async def grant_create(request: Request, user=Depends(require_admin)):
     fields = {k: (form.get(k) or None) for k in GRANT_FIELDS}
     with get_db() as db:
         db.execute(
-            f"INSERT INTO grants ({', '.join(fields)}, status) VALUES ({', '.join('?' * len(fields))}, ?)",
-            list(fields.values()) + [form.get("status") or "open"],
+            f"INSERT INTO grants ({', '.join(fields)}, source_id, status) "
+            f"VALUES ({', '.join('?' * len(fields))}, ?, ?)",
+            list(fields.values()) + [_form_source_id(form), form.get("status") or "open"],
         )
     return RedirectResponse("/grants", status_code=303)
 
@@ -133,7 +151,9 @@ async def grant_create(request: Request, user=Depends(require_admin)):
 @router.get("/grants/{grant_id}/detail", response_class=HTMLResponse)
 def grant_detail(request: Request, grant_id: int, user=Depends(require_user)):
     with get_db() as db:
-        row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
+        row = db.execute(
+            "SELECT g.*, s.name AS source_name FROM grants g "
+            "LEFT JOIN sources s ON s.id = g.source_id WHERE g.id=?", (grant_id,)).fetchone()
     if not row:
         return HTMLResponse("")
     return templates.TemplateResponse(request, "_grant_modal.html",
@@ -146,7 +166,8 @@ def grant_edit(request: Request, grant_id: int, user=Depends(require_admin)):
         row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
     if not row:
         return RedirectResponse("/grants", status_code=303)
-    return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit", types=_known_types())
+    return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit",
+                   types=_known_types(), sources=_all_sources())
 
 
 @router.post("/grants/{grant_id}/edit")
@@ -156,8 +177,8 @@ async def grant_update(request: Request, grant_id: int, user=Depends(require_adm
     sets = ", ".join(f"{k}=?" for k in fields)
     with get_db() as db:
         db.execute(
-            f"UPDATE grants SET {sets}, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            list(fields.values()) + [form.get("status") or "open", grant_id],
+            f"UPDATE grants SET {sets}, source_id=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            list(fields.values()) + [_form_source_id(form), form.get("status") or "open", grant_id],
         )
     return RedirectResponse("/grants", status_code=303)
 

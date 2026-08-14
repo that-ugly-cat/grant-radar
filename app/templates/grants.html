@@ -14,6 +14,11 @@
       <option value="{{ t }}" {% if t == f_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
       <option value="__none__" {% if f_type == '__none__' %}selected{% endif %}>(no type)</option>
     </select>
+    <select name="source">
+      <option value="">Source: all</option>
+      {% for s in sources %}<option value="{{ s.id }}" {% if f_source == s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      <option value="__none__" {% if f_source == '__none__' %}selected{% endif %}>(no source)</option>
+    </select>
     <select name="status">
       {% for s in ['open','expired','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
       <option value="" {% if not f_status %}selected{% endif %}>all</option>

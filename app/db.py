@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS grants (
     notes           TEXT,
     grant_start     TEXT,
     primary_type    TEXT,
+    source_id       INTEGER REFERENCES sources(id) ON DELETE SET NULL,
     status          TEXT DEFAULT 'open',
     origin          TEXT DEFAULT 'manual',
     last_checked_at DATETIME,
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS proposals (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     kind        TEXT NOT NULL,
     grant_id    INTEGER REFERENCES grants(id),
+    source_id   INTEGER REFERENCES sources(id) ON DELETE SET NULL,
     payload     TEXT,
     rationale   TEXT,
     source_url  TEXT,
@@ -96,6 +98,12 @@ def init_db() -> None:
         cols = [r["name"] for r in db.execute("PRAGMA table_info(grants)")]
         if "actionable" in cols:
             db.execute("ALTER TABLE grants DROP COLUMN actionable")
+        # Migrazione 2026-08-14 (2): FK grants/proposals → sources.
+        if "source_id" not in cols:
+            db.execute("ALTER TABLE grants ADD COLUMN source_id INTEGER REFERENCES sources(id) ON DELETE SET NULL")
+        pcols = [r["name"] for r in db.execute("PRAGMA table_info(proposals)")]
+        if "source_id" not in pcols:
+            db.execute("ALTER TABLE proposals ADD COLUMN source_id INTEGER REFERENCES sources(id) ON DELETE SET NULL")
 
 
 @contextmanager
@@ -110,16 +118,18 @@ def get_db():
         conn.close()
 
 
-def status_condition(status: str) -> tuple[str, list]:
+def status_condition(status: str, prefix: str = "") -> tuple[str, list]:
     """SQL condition for the status filter. 'open' and 'expired' are
     deadline-aware: open = status open AND (no deadline OR deadline in the
-    future); expired = status open but deadline passed."""
+    future); expired = status open but deadline passed. `prefix` qualifies
+    the columns when the query joins other tables (e.g. 'g.')."""
+    s, d = f"{prefix}status", f"{prefix}deadline_date"
     if status == "open":
-        return " AND status='open' AND (deadline_date IS NULL OR date(deadline_date) >= date('now'))", []
+        return f" AND {s}='open' AND ({d} IS NULL OR date({d}) >= date('now'))", []
     if status == "expired":
-        return " AND status='open' AND deadline_date IS NOT NULL AND date(deadline_date) < date('now')", []
+        return f" AND {s}='open' AND {d} IS NOT NULL AND date({d}) < date('now')", []
     if status:
-        return " AND status=?", [status]
+        return f" AND {s}=?", [status]
     return "", []
 
 
@@ -128,7 +138,7 @@ def grants_digest() -> list[dict]:
     with get_db() as db:
         rows = db.execute(
             "SELECT id, name, funder, scope, max_amount, duration_months, deadline, "
-            "deadline_date, deadline_logic, link, primary_type, status "
+            "deadline_date, deadline_logic, link, primary_type, source_id, status "
             "FROM grants ORDER BY deadline_date IS NULL, deadline_date"
         ).fetchall()
     return [dict(r) for r in rows]

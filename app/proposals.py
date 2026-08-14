@@ -33,8 +33,8 @@ def approve(proposal_id: int) -> bool:
         if p["kind"] == "new":
             if not fields.get("name"):
                 return False
-            cols = list(fields.keys()) + ["origin"]
-            vals = list(fields.values()) + ["discovery"]
+            cols = list(fields.keys()) + ["origin", "source_id"]
+            vals = list(fields.values()) + ["discovery", p["source_id"]]
             db.execute(
                 f"INSERT INTO grants ({', '.join(cols)}) VALUES ({', '.join('?' * len(vals))})",
                 vals,
@@ -45,6 +45,12 @@ def approve(proposal_id: int) -> bool:
                 f"UPDATE grants SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=?",
                 list(fields.values()) + [p["grant_id"]],
             )
+            # Se il grant non è ancora mappato a una source e la proposal sì, eredita.
+            if p["source_id"]:
+                db.execute(
+                    "UPDATE grants SET source_id=? WHERE id=? AND source_id IS NULL",
+                    (p["source_id"], p["grant_id"]),
+                )
         # kind=flag: approving just acknowledges it; nothing to write on grants.
 
         db.execute(

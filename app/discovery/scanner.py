@@ -81,7 +81,10 @@ institute cannot apply to.
 
 
 def _user_prompt(source: dict) -> str:
-    digest = json.dumps(grants_digest(), ensure_ascii=False, default=str)
+    # Ogni source vede i propri grant più gli orfani non ancora mappati.
+    digest_rows = [g for g in grants_digest()
+                   if g.get("source_id") in (source["id"], None)]
+    digest = json.dumps(digest_rows, ensure_ascii=False, default=str)
     return (
         f"Today is {date.today().isoformat()}.\n\n"
         f"FUNDING SOURCE\nname: {source['name']}\nurl: {source['url'] or '(none)'}\n"
@@ -116,9 +119,10 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
             if _duplicate_pending(db, kind, grant_id, fields.get("name")):
                 continue
             db.execute(
-                "INSERT INTO proposals (kind, grant_id, payload, rationale, source_url, confidence, method) "
-                "VALUES (?, ?, ?, ?, ?, ?, 'llm_scan')",
-                (kind, grant_id if kind == "update" else None, json.dumps(fields, ensure_ascii=False),
+                "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'llm_scan')",
+                (kind, grant_id if kind == "update" else None, source["id"],
+                 json.dumps(fields, ensure_ascii=False),
                  p.get("rationale", ""), p.get("source_url", ""), p.get("confidence", "medium")),
             )
             stored += 1

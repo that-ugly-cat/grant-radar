@@ -102,38 +102,51 @@ def list_proposals(status: str = "pending") -> str:
 
 
 def _insert_proposal(kind: str, grant_id: int | None, fields: dict, rationale: str,
-                     source_url: str, confidence: str) -> int:
+                     source_url: str, confidence: str, source_id: int | None) -> int:
     clean = {k: v for k, v in fields.items() if k in GRANT_FIELDS and v not in (None, "")}
     with get_db() as db:
         cur = db.execute(
-            "INSERT INTO proposals (kind, grant_id, payload, rationale, source_url, confidence, method) "
-            "VALUES (?, ?, ?, ?, ?, ?, 'ono_mcp')",
-            (kind, grant_id, json.dumps(clean, ensure_ascii=False), rationale, source_url, confidence),
+            "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 'ono_mcp')",
+            (kind, grant_id, source_id, json.dumps(clean, ensure_ascii=False), rationale, source_url, confidence),
         )
         return cur.lastrowid
 
 
 @mcp.tool()
-def propose_grant(fields: dict, rationale: str, source_url: str = "", confidence: str = "medium") -> str:
+def list_sources() -> str:
+    """Configured discovery sources (id, name, url, hints, enabled). Use the id
+    as source_id when filing proposals that belong to one of these sources."""
+    with get_db() as db:
+        rows = db.execute("SELECT id, name, url, hints, enabled FROM sources ORDER BY name").fetchall()
+    return json.dumps([dict(r) for r in rows], ensure_ascii=False)
+
+
+@mcp.tool()
+def propose_grant(fields: dict, rationale: str, source_url: str = "", confidence: str = "medium",
+                  source_id: int | None = None) -> str:
     """Propose a NEW grant for the queue (needs human approval in the UI).
     fields: subset of {name, funder, scope, max_amount, duration_months, deadline,
     deadline_date (YYYY-MM-DD), deadline_logic, link, notes, grant_start,
-    primary_type}. name is required."""
+    primary_type}. name is required. source_id (see list_sources) links the
+    proposal to the discovery source it belongs to; on approval the grant
+    inherits it."""
     if not fields.get("name"):
         return json.dumps({"ok": False, "error": "fields.name is required"})
-    pid = _insert_proposal("new", None, fields, rationale, source_url, confidence)
+    pid = _insert_proposal("new", None, fields, rationale, source_url, confidence, source_id)
     return json.dumps({"ok": True, "proposal_id": pid})
 
 
 @mcp.tool()
 def propose_update(grant_id: int, fields: dict, rationale: str, source_url: str = "",
-                   confidence: str = "medium") -> str:
+                   confidence: str = "medium", source_id: int | None = None) -> str:
     """Propose an UPDATE to an existing grant (needs human approval in the UI).
-    fields: only the fields that should change."""
+    fields: only the fields that should change. source_id (see list_sources)
+    is inherited by the grant on approval if the grant has none yet."""
     with get_db() as db:
         if not db.execute("SELECT id FROM grants WHERE id=?", (grant_id,)).fetchone():
             return json.dumps({"ok": False, "error": f"grant {grant_id} not found"})
     if not fields:
         return json.dumps({"ok": False, "error": "fields is empty"})
-    pid = _insert_proposal("update", grant_id, fields, rationale, source_url, confidence)
+    pid = _insert_proposal("update", grant_id, fields, rationale, source_url, confidence, source_id)
     return json.dumps({"ok": True, "proposal_id": pid})

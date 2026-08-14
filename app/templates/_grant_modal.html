@@ -20,6 +20,7 @@
       <tr><th>Status</th><td>{{ g.status }}{% if g.status == 'open' and g.deadline_date and g.deadline_date < today %} <span class="chip conf-low">expired</span>{% endif %}</td></tr>
       <tr><th>Link</th><td>{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">{{ g.link }}</a>{% if g.link_status == 'dead' %} 💀{% endif %}{% else %}—{% endif %}</td></tr>
       <tr><th>Notes</th><td>{{ g.notes or '—' }}</td></tr>
+      <tr><th>Source</th><td>{{ g.source_name or '—' }}</td></tr>
       <tr><th>Origin</th><td>{{ g.origin }}{% if g.last_checked_at %} · link checked {{ g.last_checked_at }} ({{ g.link_status or '?' }}){% endif %}</td></tr>
       <tr><th>Record</th><td class="small muted">created {{ g.created_at }} · updated {{ g.updated_at }}</td></tr>
     </table>

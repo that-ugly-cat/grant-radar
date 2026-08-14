@@ -30,10 +30,11 @@ def _pending_flag_exists(db, grant_id: int) -> bool:
 def _file_flag(db, grant_id: int, rationale: str, source_url: str) -> None:
     if _pending_flag_exists(db, grant_id):
         return
+    src = db.execute("SELECT source_id FROM grants WHERE id=?", (grant_id,)).fetchone()
     db.execute(
-        "INSERT INTO proposals (kind, grant_id, payload, rationale, source_url, confidence, method) "
-        "VALUES ('flag', ?, ?, ?, ?, 'high', 'link_monitor')",
-        (grant_id, json.dumps({}), rationale, source_url),
+        "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
+        "VALUES ('flag', ?, ?, ?, ?, ?, 'high', 'link_monitor')",
+        (grant_id, src["source_id"] if src else None, json.dumps({}), rationale, source_url),
     )
 
 

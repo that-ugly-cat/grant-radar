@@ -21,6 +21,12 @@
         {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}{% if t not in types %}<option value="{{ t }}">{% endif %}{% endfor %}
       </datalist>
     </label>
+    <label>Source
+      <select name="source_id">
+        <option value=""></option>
+        {% for s in sources %}<option value="{{ s.id }}" {% if grant.source_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </label>
     <label>Status
       <select name="status">
         {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if (grant.status or 'open') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
