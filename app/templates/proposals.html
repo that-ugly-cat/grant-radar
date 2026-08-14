@@ -14,14 +14,14 @@
     <span class="chip kind">{{ p.kind }}</span>
     <span class="chip conf-{{ p.confidence }}">{{ p.confidence }}</span>
     <span class="chip">{{ p.method }}</span>
-    {% if p.grant_name %}<strong>{{ p.grant_name }}</strong>{% elif p.kind == 'new' %}<strong>{{ (p.payload_pretty and (p.diff | selectattr('field', 'equalto', 'name') | map(attribute='new') | first)) or 'nuovo grant' }}</strong>{% endif %}
+    {% if p.grant_name %}<strong>{{ p.grant_name }}</strong>{% elif p.kind == 'new' %}<strong>{{ (p.diff | selectattr('field', 'equalto', 'name') | map(attribute='new') | first) or 'new grant' }}</strong>{% endif %}
     <span class="muted small">{{ p.created_at }}</span>
   </div>
   <p>{{ p.rationale }}</p>
   {% if p.source_url %}<p class="small"><a href="{{ p.source_url }}" target="_blank" rel="noopener">{{ p.source_url }}</a></p>{% endif %}
   {% if p.diff %}
   <table class="diff">
-    <thead><tr><th>Campo</th><th>Attuale</th><th>Proposto</th></tr></thead>
+    <thead><tr><th>Field</th><th>Current</th><th>Proposed</th></tr></thead>
     <tbody>
       {% for d in p.diff %}
       <tr><td>{{ d.field }}</td><td class="old">{{ d.old or '—' }}</td><td class="new">{{ d.new or '—' }}</td></tr>
@@ -31,12 +31,12 @@
   {% endif %}
   {% if p.status == 'pending' and user.role == 'admin' %}
   <div class="actions">
-    <form method="post" action="/proposals/{{ p.id }}/approve"><button type="submit">✓ Approva</button></form>
-    <form method="post" action="/proposals/{{ p.id }}/reject"><button class="danger" type="submit">✗ Rigetta</button></form>
+    <form method="post" action="/proposals/{{ p.id }}/approve"><button type="submit">✓ Approve</button></form>
+    <form method="post" action="/proposals/{{ p.id }}/reject"><button class="danger" type="submit">✗ Reject</button></form>
   </div>
   {% endif %}
 </div>
 {% else %}
-<p class="muted">Nessuna proposal {{ f_status }}.</p>
+<p class="muted">No {{ f_status }} proposals.</p>
 {% endfor %}
 {% endblock %}

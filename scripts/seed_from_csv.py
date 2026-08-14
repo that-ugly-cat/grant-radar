@@ -58,7 +58,7 @@ def main(path: str) -> None:
                     list(fields.values()),
                 )
                 inserted += 1
-    print(f"Seed: {inserted} inseriti, {skipped} saltati (già presenti).")
+    print(f"Seed: {inserted} inserted, {skipped} skipped (already present).")
 
 
 if __name__ == "__main__":

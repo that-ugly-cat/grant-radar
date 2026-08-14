@@ -49,7 +49,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
     if not row or not verify_password(password, row["password_hash"]):
         return templates.TemplateResponse(
             request, "login.html",
-            {"error": "Credenziali non valide", "user": None, "pending_count": 0}, status_code=401)
+            {"error": "Invalid credentials", "user": None, "pending_count": 0}, status_code=401)
     token = make_token(row["id"], row["username"], row["role"])
     resp = RedirectResponse("/grants", status_code=303)
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
@@ -154,7 +154,6 @@ def proposals_page(request: Request, status: str = "pending", user=Depends(requi
     for r in rows:
         p = dict(r)
         p["diff"] = compute_diff(p)
-        p["payload_pretty"] = json.dumps(json.loads(p["payload"] or "{}"), indent=2, ensure_ascii=False)
         items.append(p)
     return _render(request, "proposals.html", proposals=items, f_status=status)
 

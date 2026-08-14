@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="toolbar">
-  <form class="filters" hx-get="/grants" hx-target="#grants-table" hx-push-url="true" >
-    <input type="search" name="q" value="{{ q }}" placeholder="Cerca…" hx-trigger="keyup changed delay:400ms" hx-get="/grants" hx-target="#grants-table">
+  <form class="filters" hx-get="/grants" hx-target="#grants-table" hx-push-url="true">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search…" hx-trigger="keyup changed delay:400ms" hx-get="/grants" hx-target="#grants-table">
     <select name="funder" hx-get="/grants" hx-target="#grants-table">
-      <option value="">Funder: tutti</option>
+      <option value="">Funder: all</option>
       {% for f in funders %}<option value="{{ f }}" {% if f == f_funder %}selected{% endif %}>{{ f }}</option>{% endfor %}
     </select>
     <select name="primary_type" hx-get="/grants" hx-target="#grants-table">
-      <option value="">Tipo: tutti</option>
+      <option value="">Type: all</option>
       {% for t in ['Project','Postdoc','PI','Network','PhD','Other'] %}
       <option value="{{ t }}" {% if t == f_type %}selected{% endif %}>{{ t }}</option>{% endfor %}
     </select>
     <select name="actionable" hx-get="/grants" hx-target="#grants-table">
-      <option value="">Actionable: tutti</option>
+      <option value="">Actionable: all</option>
       {% for a in ['Yes','Maybe','No'] %}<option value="{{ a }}" {% if a == f_actionable %}selected{% endif %}>{{ a }}</option>{% endfor %}
     </select>
     <select name="status" hx-get="/grants" hx-target="#grants-table">
       {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
-      <option value="" {% if not f_status %}selected{% endif %}>tutti</option>
+      <option value="" {% if not f_status %}selected{% endif %}>all</option>
     </select>
   </form>
-  {% if user.role == 'admin' %}<a class="btn" href="/grants/new">+ Nuovo grant</a>{% endif %}
+  {% if user.role == 'admin' %}<a class="btn" href="/grants/new">+ New grant</a>{% endif %}
 </div>
 <div id="grants-table">
   {% include "_grants_table.html" %}

@@ -2,13 +2,13 @@
   <thead>
     <tr>
       <th>Grant</th><th>Funder</th><th>Scope</th><th>Max</th><th>Deadline</th>
-      <th>Tipo</th><th>Act.</th><th>Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
+      <th>Type</th><th>Act.</th><th>Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
     </tr>
   </thead>
   <tbody>
     {% for g in grants %}
     <tr class="{% if g.link_status == 'dead' %}row-dead{% endif %}">
-      <td><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Trovato dalla discovery">📡</span>{% endif %}
+      <td><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Found by discovery">📡</span>{% endif %}
         {% if g.notes %}<div class="muted small">{{ g.notes }}</div>{% endif %}</td>
       <td>{{ g.funder or '—' }}</td>
       <td class="small">{{ g.scope or '—' }}</td>
@@ -24,7 +24,7 @@
       {% if user.role == 'admin' %}<td><a class="small" href="/grants/{{ g.id }}/edit">edit</a></td>{% endif %}
     </tr>
     {% else %}
-    <tr><td colspan="9" class="muted">Nessun grant trovato.</td></tr>
+    <tr><td colspan="9" class="muted">No grants found.</td></tr>
     {% endfor %}
   </tbody>
 </table>

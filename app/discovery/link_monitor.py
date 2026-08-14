@@ -69,10 +69,10 @@ def run_link_monitor() -> dict:
                 )
                 if status == "dead":
                     dead += 1
-                    _file_flag(db, g["id"], "Link non raggiungibile (errore HTTP o rete).", g["link"])
+                    _file_flag(db, g["id"], "Link unreachable (HTTP or network error).", g["link"])
                 elif status == "changed":
                     changed += 1
-                    _file_flag(db, g["id"], "La pagina del bando è cambiata dall'ultimo controllo.", g["link"])
+                    _file_flag(db, g["id"], "The call's page has changed since the last check.", g["link"])
 
     summary = {"checked": checked, "dead": dead, "changed": changed}
     print(f"[link-monitor] {summary}")
