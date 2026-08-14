@@ -2,6 +2,7 @@
 import json
 import os
 import threading
+from datetime import date
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -9,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
                     new_api_key, require_admin, require_user, verify_password)
-from ..db import get_db, GRANT_FIELDS
+from ..db import get_db, status_condition, GRANT_FIELDS
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
 from ..proposals import approve, compute_diff, reject
@@ -71,10 +72,13 @@ def _query_grants(q, funder, ptype, actionable, status):
     if q:
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ? OR funder LIKE ?)"
         args += [f"%{q}%"] * 4
-    for col, val in (("funder", funder), ("primary_type", ptype), ("actionable", actionable), ("status", status)):
+    for col, val in (("funder", funder), ("primary_type", ptype), ("actionable", actionable)):
         if val:
             sql += f" AND {col} = ?"
             args.append(val)
+    cond, cond_args = status_condition(status)
+    sql += cond
+    args += cond_args
     sql += " ORDER BY deadline_date IS NULL, deadline_date"
     with get_db() as db:
         rows = db.execute(sql, args).fetchall()
@@ -88,7 +92,9 @@ def grants_page(request: Request, q: str = "", funder: str = "", primary_type: s
                 actionable: str = "", status: str = "open", user=Depends(require_user)):
     grants, funders = _query_grants(q, funder, primary_type, actionable, status)
     ctx = {"grants": grants, "funders": funders, "q": q, "f_funder": funder,
-           "f_type": primary_type, "f_actionable": actionable, "f_status": status}
+           "f_type": primary_type, "f_actionable": actionable, "f_status": status,
+           "today": date.today().isoformat()}
+
     if request.headers.get("HX-Request"):
         return _render(request, "_grants_table.html", **ctx)
     return _render(request, "grants.html", **ctx)

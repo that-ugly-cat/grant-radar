@@ -14,7 +14,7 @@
       <td class="small">{{ g.scope or '—' }}</td>
       <td class="small">{{ g.max_amount or '—' }}</td>
       <td>
-        {% if g.deadline_date %}<span class="deadline" data-date="{{ g.deadline_date }}">{{ g.deadline_date }}</span>
+        {% if g.deadline_date %}<span class="deadline {% if g.deadline_date < today %}deadline-past{% endif %}">{{ g.deadline_date }}</span>
         {% elif g.deadline %}{{ g.deadline }}{% else %}—{% endif %}
         {% if g.deadline_logic %}<div class="muted small">{{ g.deadline_logic }}</div>{% endif %}
       </td>

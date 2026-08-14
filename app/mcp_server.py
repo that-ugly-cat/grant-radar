@@ -8,7 +8,7 @@ import json
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 
-from .db import get_db, GRANT_FIELDS
+from .db import get_db, status_condition, GRANT_FIELDS
 
 mcp = MCPServer(
     "grant-radar",
@@ -39,8 +39,10 @@ def search_grants(
     status: str = "open",
 ) -> str:
     """Search tracked grants. q matches name/scope/notes (substring); funder,
-    primary_type (Project|Postdoc|PI|Network|PhD|Other), actionable (Yes|No|Maybe)
-    and status (open|closed|archived, '' for any) filter exactly.
+    primary_type (Project|Postdoc|PI|Network|PhD|Other) and actionable
+    (Yes|No|Maybe) filter exactly. status is deadline-aware: 'open' = status
+    open AND deadline in the future or absent; 'expired' = status open but
+    deadline passed; 'closed'/'archived' = manual states; '' = any.
     Returns a JSON list sorted by next deadline."""
     sql = "SELECT * FROM grants WHERE 1=1"
     args: list = []
@@ -48,10 +50,13 @@ def search_grants(
         sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ?)"
         args += [f"%{q}%"] * 3
     for col, val in (("funder", funder), ("primary_type", primary_type),
-                     ("actionable", actionable), ("status", status)):
+                     ("actionable", actionable)):
         if val:
             sql += f" AND {col} = ?"
             args.append(val)
+    cond, cond_args = status_condition(status)
+    sql += cond
+    args += cond_args
     sql += " ORDER BY deadline_date IS NULL, deadline_date"
     with get_db() as db:
         rows = db.execute(sql, args).fetchall()

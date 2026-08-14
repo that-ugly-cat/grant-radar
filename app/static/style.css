@@ -52,6 +52,7 @@ th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid #1e2
 th { color: var(--faint); font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
 tr:hover td { background: var(--card); }
 tr.row-dead td { background: var(--danger-bg); }
+.deadline-past { color: var(--danger); font-weight: 600; }
 tr.row-disabled td { opacity: 0.45; }
 
 /* forms & buttons */

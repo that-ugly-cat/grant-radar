@@ -107,6 +107,19 @@ def get_db():
         conn.close()
 
 
+def status_condition(status: str) -> tuple[str, list]:
+    """SQL condition for the status filter. 'open' and 'expired' are
+    deadline-aware: open = status open AND (no deadline OR deadline in the
+    future); expired = status open but deadline passed."""
+    if status == "open":
+        return " AND status='open' AND (deadline_date IS NULL OR date(deadline_date) >= date('now'))", []
+    if status == "expired":
+        return " AND status='open' AND deadline_date IS NOT NULL AND date(deadline_date) < date('now')", []
+    if status:
+        return " AND status=?", [status]
+    return "", []
+
+
 def grants_digest() -> list[dict]:
     """Compact dump of current grants, used by the scanner prompt and /ono/grants."""
     with get_db() as db:

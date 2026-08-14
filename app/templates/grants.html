@@ -17,7 +17,7 @@
       {% for a in ['Yes','Maybe','No'] %}<option value="{{ a }}" {% if a == f_actionable %}selected{% endif %}>{{ a }}</option>{% endfor %}
     </select>
     <select name="status" hx-get="/grants" hx-target="#grants-table">
-      {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      {% for s in ['open','expired','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
       <option value="" {% if not f_status %}selected{% endif %}>all</option>
     </select>
   </form>
