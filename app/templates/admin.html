@@ -13,12 +13,19 @@
 <div class="card">
   <h2>Users</h2>
   <table>
-    <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
+    <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Active</th><th>Password</th><th></th></tr></thead>
     <tbody>
       {% for u in users %}
       <tr>
         <td>{{ u.username }}</td><td>{{ u.email }}</td><td>{{ u.role }}</td>
         <td>{{ '✓' if u.active else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/users/{{ u.id }}/password" class="inline-form"
+                onsubmit="return confirm('Set a new password for {{ u.username }}?')">
+            <input name="password" type="password" placeholder="new password" minlength="8" required autocomplete="new-password">
+            <button class="small" type="submit">set</button>
+          </form>
+        </td>
         <td><form method="post" action="/admin/users/{{ u.id }}/toggle"><button class="small" type="submit">{{ 'deactivate' if u.active else 'reactivate' }}</button></form></td>
       </tr>
       {% endfor %}

@@ -4,7 +4,7 @@ import os
 import threading
 from datetime import date
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -307,6 +307,18 @@ def user_create(username: str = Form(...), email: str = Form(...), password: str
     with get_db() as db:
         db.execute("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
                    (username, email, hash_password(password), role if role in ("reader", "admin") else "reader"))
+    return RedirectResponse("/admin", status_code=303)
+
+
+@router.post("/admin/users/{user_id}/password")
+def user_set_password(user_id: int, password: str = Form(...), user=Depends(require_admin)):
+    if len(password) < 8:
+        raise HTTPException(status_code=422, detail="Password too short (min 8 chars)")
+    with get_db() as db:
+        cur = db.execute("UPDATE users SET password_hash=? WHERE id=?",
+                         (hash_password(password), user_id))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found")
     return RedirectResponse("/admin", status_code=303)
 
 
