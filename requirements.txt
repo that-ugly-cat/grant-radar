@@ -7,3 +7,4 @@ anthropic>=0.60
 mcp>=1.9
 PyJWT>=2.8
 APScheduler>=3.10
+openpyxl>=3.1

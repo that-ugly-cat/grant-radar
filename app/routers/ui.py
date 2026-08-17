@@ -5,7 +5,7 @@ import threading
 from datetime import date
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
@@ -128,6 +128,52 @@ def _all_sources() -> list[dict]:
 def _form_source_id(form) -> int | None:
     raw = form.get("source_id") or ""
     return int(raw) if raw.isdigit() else None
+
+
+EXPORT_COLS = [
+    ("Name", "name"), ("Funder", "funder"), ("Scope", "scope"), ("Max amount", "max_amount"),
+    ("Duration (months)", "duration_months"), ("Deadline", "deadline"), ("Deadline date", "deadline_date"),
+    ("Recurrence", "deadline_logic"), ("Link", "link"), ("Notes", "notes"), ("Grant start", "grant_start"),
+    ("Type", "primary_type"), ("Source", "source_name"), ("Status", "status"), ("Origin", "origin"),
+]
+
+
+def _xl_safe(value):
+    """Formula-injection guard: neutralize leading =, +, -, @ in text cells."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
+@router.get("/grants/export.xlsx")
+def grants_export(q: str = "", funder: str = "", primary_type: str = "",
+                  source: str = "", status: str = "open", user=Depends(require_user)):
+    import io
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+
+    grants, _, _, _ = _query_grants(q, funder, primary_type, source, status)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Grants"
+    ws.append([h for h, _ in EXPORT_COLS])
+    for cell in ws[1]:
+        cell.font = cell.font.copy(bold=True)
+    for g in grants:
+        ws.append([_xl_safe(g.get(k)) for _, k in EXPORT_COLS])
+    for i, (header, key) in enumerate(EXPORT_COLS, start=1):
+        width = max([len(header)] + [len(str(g.get(key) or "")) for g in grants] or [10])
+        ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 10), 60)
+    ws.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    filename = f"grantradar-{date.today().isoformat()}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/grants/new", response_class=HTMLResponse)

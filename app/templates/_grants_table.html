@@ -32,3 +32,6 @@
     {% endfor %}
   </tbody>
 </table>
+<p class="small" style="text-align: right; margin-top: -0.8rem;">
+  <a href="/grants/export.xlsx?q={{ q|urlencode }}&funder={{ f_funder|urlencode }}&primary_type={{ f_type|urlencode }}&source={{ f_source|urlencode }}&status={{ f_status|urlencode }}">⬇ Export to Excel (current filter)</a>
+</p>
