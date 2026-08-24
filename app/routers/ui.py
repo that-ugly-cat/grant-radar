@@ -46,15 +46,22 @@ def login_page(request: Request):
     # the proxy to hide it: the app knows its own mode better than the reverse
     # proxy does, and two sets of credentials for one table is exactly what the
     # SSO exists to remove.
+    #
+    # It sends you to a GATED path, not to `/`. That distinction is the whole
+    # bug this line exists to fix: `/` is public, so the gate never sees the
+    # request and the identity headers are stripped from it — the landing can
+    # therefore never recognise you, and its only button points back here. `/`
+    # -> `/login` -> `/` is a closed loop with no way in. Pointing at `/grants`
+    # hands the request to the gate, which is the one thing able to log you in.
     if gateway_mode():
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/grants", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None, "user": None, "pending_count": 0})
 
 
 @router.post("/login")
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
     if gateway_mode():
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/grants", status_code=303)
     with get_db() as db:
         row = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
