@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     role          TEXT NOT NULL DEFAULT 'reader',
     active        BOOLEAN DEFAULT 1,
+    borant_sub    TEXT UNIQUE,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -108,6 +109,15 @@ def init_db() -> None:
         # Migrazione 2026-08-14 (3): timestamp dell'ultima verifica LLM per-grant.
         if "last_verified_at" not in cols:
             db.execute("ALTER TABLE grants ADD COLUMN last_verified_at DATETIME")
+        # Migrazione 2026-08-24: il subject con cui Borant ID conosce l'utente,
+        # scritto una volta sola da scripts/map_borant.py. NULL finche' non lo
+        # si lega, e in AUTH_MODE=local non lo guarda nessuno. UNIQUE lo mette
+        # un indice a parte perche' ALTER TABLE ADD COLUMN non accetta UNIQUE.
+        ucols = [r["name"] for r in db.execute("PRAGMA table_info(users)")]
+        if "borant_sub" not in ucols:
+            db.execute("ALTER TABLE users ADD COLUMN borant_sub TEXT")
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_borant_sub "
+                   "ON users(borant_sub) WHERE borant_sub IS NOT NULL")
 
 
 @contextmanager

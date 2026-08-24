@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 import os
 
-from .auth import bootstrap_admin, check_api_key
+from .auth import AUTH_MODE, bootstrap_admin, check_api_key
 from .db import init_db
 from .discovery.link_monitor import run_link_monitor
 from .discovery.scanner import run_scan
@@ -67,6 +67,16 @@ async def mcp_auth(request: Request, call_next):
         if request.scope["path"] == "/mcp":
             request.scope["path"] = "/mcp/"
     return await call_next(request)
+
+
+@app.get("/healthz")
+def healthz():
+    """Liveness, and it stays outside any gate.
+
+    Not monitoring: it says the process answers, not that the nightly link
+    monitor ran or that the monthly scan did anything. Those live in scan_log.
+    """
+    return {"ok": True, "mode": AUTH_MODE}
 
 
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")

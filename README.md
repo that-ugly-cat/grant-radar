@@ -59,3 +59,51 @@ then Caddy: `grantradar.borant.eu → reverse_proxy localhost:8015`.
 
 Update: `git pull && docker compose up --build -d` (the DB lives in `./data/`,
 untouched by pulls; schema init is idempotent).
+
+## Authentication: two modes
+
+The app authenticates on its own by default and never needs an identity
+provider. `AUTH_MODE=gateway` is the other mode, for a deploy that sits behind
+an SSO gate speaking the `X-Borant-*` header contract.
+
+```
+AUTH_MODE=local     (default)   email + password against the users table
+AUTH_MODE=gateway               the upstream gate vouches via X-Borant-Sub
+```
+
+`local` is the default deliberately. An app that believes an identity header
+with no gate in front of it lets anyone be anyone, so the gateway path stays
+dead code until someone turns it on. In `gateway` the app additionally checks
+that the request came from `BORANT_TRUSTED_PROXY` — under Docker that is a
+bridge gateway and **not** `127.0.0.1`, and it is read off the app's log after
+a real request rather than deduced from the network layout.
+
+Three things that do not change in `gateway`:
+
+- **The machine surfaces keep their own keys.** `/mcp`, `/mcp/k/{key}`,
+  `/api/*` and `/ono/grants` authenticate with the revocable `api_keys` table,
+  because a model client has no browser and no cookie. They belong outside any
+  gate.
+- **Local passwords stay populated.** That is what makes flipping back to
+  `local` a working way home. A user who only ever arrived through the gate is
+  given a random local password nobody knows; an admin can set a real one from
+  `/admin`.
+- **A role that spends is never provisioned quietly.** `POST /scan-now` and
+  `POST /grants/{id}/check` draw on the server's Anthropic key with no
+  per-user ceiling, and `admin` is the role that reaches them. The gate's
+  `X-Borant-Hint` may carry `admin` and it is honoured — but only at profile
+  creation, only from the trusted proxy, and only with a warning naming the
+  address and the subject. An unrecognised hint is treated as a typo and falls
+  back to `reader` rather than inventing a role.
+
+Linking existing accounts to gate subjects is a one-off manual step, run before
+the mode is flipped:
+
+```
+docker exec grantradar python scripts/map_borant.py --report
+docker exec grantradar python scripts/map_borant.py --map you@example.org=01ABC...
+```
+
+Rollback is two independent moves: `AUTH_MODE=local` plus
+`docker compose up -d` restores the app as it was, and dropping the gate's
+block from the reverse proxy removes the redirect to its login.

@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from ..auth import (COOKIE_NAME, get_user_or_none, hash_password, make_token,
-                    new_api_key, require_admin, require_user, verify_password)
+from ..auth import (BORANT_LOGOUT_URL, COOKIE_NAME, gateway_mode,
+                    get_user_or_none, hash_password, make_token, new_api_key,
+                    require_admin, require_user, verify_password)
 from ..db import get_db, status_condition, GRANT_FIELDS
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
@@ -41,11 +42,19 @@ def landing(request: Request):
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
+    # In gateway mode the app switches its own login off rather than trusting
+    # the proxy to hide it: the app knows its own mode better than the reverse
+    # proxy does, and two sets of credentials for one table is exactly what the
+    # SSO exists to remove.
+    if gateway_mode():
+        return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None, "user": None, "pending_count": 0})
 
 
 @router.post("/login")
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if gateway_mode():
+        return RedirectResponse("/", status_code=303)
     with get_db() as db:
         row = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
@@ -60,7 +69,12 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
 
 @router.get("/logout")
 def logout():
-    resp = RedirectResponse("/login", status_code=303)
+    # Dropping the local cookie is not signing out when the gate holds the
+    # session: the next click would walk straight back in. The target is the
+    # gate's GET /logout, which asks — POST /logout is what revokes, and it has
+    # to stay a POST or an <img src> on any site would sign people out.
+    target = BORANT_LOGOUT_URL if gateway_mode() else "/login"
+    resp = RedirectResponse(target, status_code=303)
     resp.delete_cookie(COOKIE_NAME)
     return resp
 
