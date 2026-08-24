@@ -107,3 +107,36 @@ docker exec grantradar python scripts/map_borant.py --map you@example.org=01ABC.
 Rollback is two independent moves: `AUTH_MODE=local` plus
 `docker compose up -d` restores the app as it was, and dropping the gate's
 block from the reverse proxy removes the redirect to its login.
+
+## The landing, the home, and the role hint
+
+Same shape in every app of the perimeter, so there is nothing to remember per
+tool.
+
+**`/` is a public showcase and never asks who is reading it.** Not laziness: on
+the public branch of the reverse proxy the `X-Borant-*` headers are stripped by
+construction, so a branch on the user is always false behind the gate and
+sometimes true without one — the same page with two behaviours. By not asking,
+the page is identical in both modes and one button covers all four cases:
+gated or standalone, already signed in or not. It also shows no internal
+counts: anyone can read it.
+
+**The app lives at `/app`**, which is gated, and the showcase's button
+points there — not at `/login`, which on a page that can never recognise anyone
+would close a loop with no way in, and not at the gate's own URL, which would
+work and would wire Borant ID into an app that must keep running without it.
+
+**The role hint is honoured**, with a vocabulary of `reader, admin`. `admin`
+reaches `POST /scan-now` and `POST /grants/{id}/check`, both of which spend on
+the server's Anthropic key with no per-user ceiling, so granting it this way is
+logged loudly. An unrecognised hint is a typo, not a role, and falls back to
+`reader`. `/grants` is a permanent redirect to `/app` that carries its query
+string, so filtered bookmarks keep working.
+
+**A page that needs an identity fails closed.** In `gateway` an unauthenticated
+request does *not* redirect to `/login` — the app switches that route off in
+this mode and sends it back, so the two would bounce forever. Production never
+shows it because the gate intercepts first, but a wrong proxy matcher would
+produce a spin instead of an error, and a loop is far harder to diagnose than a
+status code. The answer is a 503 naming what the operator should check, because
+a request arriving with no identity means the gate did not run.
