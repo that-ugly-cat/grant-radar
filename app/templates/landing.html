@@ -102,7 +102,11 @@ human has read the diff and clicked approve.
 </div>
 
 <div class="cta">
-  {% if user %}<a class="btn" href="/grants">Open the table →</a>
-  {% else %}<a class="btn" href="/login">Login →</a>{% endif %}
+  {# Un bottone solo, e non guarda chi sei. Questa pagina sta sul ramo
+     pubblico, dove l'identita' viene tolta per costruzione: `{% if user %}`
+     sarebbe sempre falso dietro il gate e a volte vero senza, cioe' la stessa
+     pagina con due comportamenti. `/app` e' gated, quindi copre i quattro
+     casi — gia' dentro o no, col gate o senza. #}
+  <a class="btn" href="/app">Open the table →</a>
 </div>
 {% endblock %}

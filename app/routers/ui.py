@@ -54,14 +54,14 @@ def login_page(request: Request):
     # -> `/login` -> `/` is a closed loop with no way in. Pointing at `/grants`
     # hands the request to the gate, which is the one thing able to log you in.
     if gateway_mode():
-        return RedirectResponse("/grants", status_code=303)
+        return RedirectResponse("/app", status_code=303)
     return templates.TemplateResponse(request, "login.html", {"error": None, "user": None, "pending_count": 0})
 
 
 @router.post("/login")
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
     if gateway_mode():
-        return RedirectResponse("/grants", status_code=303)
+        return RedirectResponse("/app", status_code=303)
     with get_db() as db:
         row = db.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
@@ -69,7 +69,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
             request, "login.html",
             {"error": "Invalid credentials", "user": None, "pending_count": 0}, status_code=401)
     token = make_token(row["id"], row["username"], row["role"])
-    resp = RedirectResponse("/grants", status_code=303)
+    resp = RedirectResponse("/app", status_code=303)
     resp.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
     return resp
 
@@ -121,7 +121,22 @@ def _query_grants(q, funder, ptype, source, status):
     return [dict(r) for r in rows], funders, types, sources
 
 
-@router.get("/grants", response_class=HTMLResponse)
+@router.get("/grants")
+def grants_legacy(request: Request):
+    """La tavola sta a `/app` dal 24/8/2026, come in tutte le app del perimetro.
+
+    Questo redirect si porta dietro la **query string**, e non e' un dettaglio:
+    `/grants?status=expired` e simili sono viste filtrate che qualcuno ha nei
+    segnalibri, e un redirect che perde i parametri le trasforma tutte nella
+    stessa pagina senza dire niente. Permanente, cosi' i browser smettono di
+    chiedere. Le rotte figlie — /grants/new, /grants/{id}/detail — restano dove
+    sono: `/app` e' la home, `/grants/...` resta la famiglia della risorsa.
+    """
+    coda = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"/app{coda}", status_code=301)
+
+
+@router.get("/app", response_class=HTMLResponse)
 def grants_page(request: Request, q: str = "", funder: str = "", primary_type: str = "",
                 source: str = "", status: str = "open", user=Depends(require_user)):
     grants, funders, types, sources = _query_grants(q, funder, primary_type, source, status)
@@ -213,7 +228,7 @@ async def grant_create(request: Request, user=Depends(require_admin)):
             f"VALUES ({', '.join('?' * len(fields))}, ?, ?)",
             list(fields.values()) + [_form_source_id(form), form.get("status") or "open"],
         )
-    return RedirectResponse("/grants", status_code=303)
+    return RedirectResponse("/app", status_code=303)
 
 
 @router.get("/grants/{grant_id}/detail", response_class=HTMLResponse)
@@ -233,7 +248,7 @@ def grant_edit(request: Request, grant_id: int, user=Depends(require_admin)):
     with get_db() as db:
         row = db.execute("SELECT * FROM grants WHERE id=?", (grant_id,)).fetchone()
     if not row:
-        return RedirectResponse("/grants", status_code=303)
+        return RedirectResponse("/app", status_code=303)
     return _render(request, "grant_form.html", grant=dict(row), action=f"/grants/{grant_id}/edit",
                    types=_known_types(), sources=_all_sources())
 
@@ -248,13 +263,13 @@ async def grant_update(request: Request, grant_id: int, user=Depends(require_adm
             f"UPDATE grants SET {sets}, source_id=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             list(fields.values()) + [_form_source_id(form), form.get("status") or "open", grant_id],
         )
-    return RedirectResponse("/grants", status_code=303)
+    return RedirectResponse("/app", status_code=303)
 
 
 @router.post("/grants/{grant_id}/check")
 def grant_check(grant_id: int, user=Depends(require_admin)):
     threading.Thread(target=verify_grant, args=(grant_id,), daemon=True).start()
-    return RedirectResponse("/grants?checked=1", status_code=303)
+    return RedirectResponse("/app?checked=1", status_code=303)
 
 
 @router.post("/grants/{grant_id}/delete")
@@ -262,7 +277,7 @@ def grant_delete(grant_id: int, user=Depends(require_admin)):
     with get_db() as db:
         db.execute("DELETE FROM proposals WHERE grant_id=?", (grant_id,))
         db.execute("DELETE FROM grants WHERE id=?", (grant_id,))
-    return RedirectResponse("/grants", status_code=303)
+    return RedirectResponse("/app", status_code=303)
 
 
 # --- proposals ---

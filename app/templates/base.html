@@ -13,13 +13,16 @@
   <span class="tagline-top">a funding table that watches the horizon by itself</span>
   <nav>
     {% if user %}
-      <a href="/grants">grants</a>
+      <a href="/app">grants</a>
       <a href="/proposals">proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
       <a href="/sources">sources</a>
       {% if user.role == 'admin' %}<a href="/admin">admin</a>{% endif %}
       <a href="/logout">logout ({{ user.username }})</a>
     {% else %}
-      <a href="/login">login</a>
+      {# `/app` e non `/login`: sulla landing pubblica l'identita' non arriva,
+         quindi questo ramo e' l'unico che si vede li' — e deve portare a un
+         path gated, che funziona sia col gate davanti sia senza. #}
+      <a href="/app">enter</a>
     {% endif %}
   </nav>
 </header>
