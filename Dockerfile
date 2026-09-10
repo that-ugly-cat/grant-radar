@@ -5,6 +5,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+# The user guide is served from /guide and lives at the repo root.
+COPY docs ./docs
 COPY scripts ./scripts
 
 # docker compose build --build-arg GIT_COMMIT=$(git rev-parse --short=12 HEAD)
