@@ -15,13 +15,20 @@ touching your data.
     (`claude-opus-5` + server-side web search). The model compares what it finds
     against the current table and proposes `new` / `update` entries.
 - **Proposals queue** — nothing written by machines reaches the grants table
-  without a human clicking Approve on a field-by-field diff. Decided proposals
-  are never deleted: they are the audit log of the radar.
+  without a human clicking Approve on a field-by-field diff. A decided proposal
+  is never rewritten and stays readable under the `approved` / `rejected`
+  filters — that is the radar's trail. It is not indestructible: deleting a
+  grant deletes its proposals with it, on purpose, because a proposal pointing
+  at a row that no longer exists is worse than no proposal. To keep the trail of
+  a scheme that is over, set it to `archived` instead of deleting it.
 - **Sources** — the radar only looks where you point it: each source has a URL
   and free-text hints for the scanner.
-- **API for agents** — MCP (streamable HTTP) at `/mcp` with tools
+- **API for agents** — MCP (streamable HTTP) at `/mcp` with seven tools:
   `search_grants`, `get_grant`, `upcoming_deadlines`, `list_proposals`,
-  `propose_grant`, `propose_update`. Auth via `X-API-Key` header **or**
+  `list_sources`, `propose_grant`, `propose_update` — one per `@mcp.tool()` in
+  `app/mcp_server.py`, which is where to check rather than trusting this line;
+  the landing renders the list from the registry for the same reason. Auth via
+  `X-API-Key` header **or**
   capability URL `/mcp/k/{key}` for clients that can't send headers.
   REST: `GET /ono/grants` (compact dump) + minimal JSON CRUD under `/api`.
   Proposal approval is deliberately not exposed to the API.

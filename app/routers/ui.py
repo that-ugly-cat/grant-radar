@@ -15,6 +15,7 @@ from ..db import get_db, status_condition, GRANT_FIELDS
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
 from ..discovery.verifier import verify_grant
+from ..mcp_server import tool_names
 from ..proposals import approve, compute_diff, reject
 from ..version import commit_hash
 
@@ -54,7 +55,9 @@ def guide(request: Request):
 
 @router.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    return _render(request, "landing.html")
+    # The tool list comes from the MCP registry, so the page cannot go on
+    # claiming a number the code has since outgrown.
+    return _render(request, "landing.html", mcp_tools=tool_names())
 
 
 # --- auth ---

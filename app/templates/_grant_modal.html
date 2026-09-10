@@ -1,7 +1,7 @@
 <div class="modal-overlay" onclick="if (event.target === this) document.getElementById('modal').innerHTML = ''">
   <div class="modal-card">
     <div class="modal-head">
-      <h2>{{ g.name }}{% if g.origin == 'discovery' %} <span class="chip" title="Found by discovery">📡</span>{% endif %}</h2>
+      <h2>{{ g.name }}{% if g.origin == 'discovery' %} <span class="chip" title="Entered through the proposals queue (not typed into the form). What filed the proposal is on the proposals page.">📡</span>{% endif %}</h2>
       <button class="modal-close" onclick="document.getElementById('modal').innerHTML = ''" aria-label="Close">✕</button>
     </div>
     <table class="detail">

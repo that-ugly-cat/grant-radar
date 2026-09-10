@@ -14,8 +14,9 @@ human has read the diff and clicked approve.
     <div class="pillar-text"><strong>The table stays human</strong>
     <span>Grants are edited like rows in a spreadsheet: filters, deadlines,
     one form. Discovery can only propose — approval is a human click on a
-    field-by-field diff, and decided proposals are never deleted: they are
-    the radar's audit log.</span></div>
+    field-by-field diff, and a decided proposal is never rewritten: it stays
+    readable as the radar's trail. Deleting a grant does take its proposals
+    with it, so a scheme that is over goes to <em>archived</em> instead.</span></div>
   </div>
   <div class="pillar">
     <div class="pillar-icon">📡</div>
@@ -71,8 +72,12 @@ human has read the diff and clicked approve.
       auth, Docker behind Caddy. Four working tables: <code>grants</code>,
       <code>proposals</code> (kind new/update/flag, JSON payload, rationale,
       confidence, method), <code>sources</code>, <code>users</code> — plus
-      <code>scan_log</code>. Decided proposals are never deleted: light audit
-      log by construction.</p>
+      <code>scan_log</code>. A decided proposal is never rewritten and stays
+      readable under the <em>approved</em> and <em>rejected</em> filters, which
+      is the trail; the one thing that removes it is deleting its grant, which
+      cascades on <code>grant_id</code> rather than leaving a proposal pointing
+      at a row that is gone. <code>archived</code> keeps both the row and its
+      trail.</p>
       <p><strong>Discovery, two engines.</strong> A nightly link monitor
       (httpx, no LLM) fetches every tracked link, hashes the readable text,
       and files <code>flag</code> proposals for dead links and changed pages.
@@ -85,11 +90,12 @@ human has read the diff and clicked approve.
       so the model distinguishes <em>new</em> from <em>update</em>;
       <code>pause_turn</code> is handled; a wrong proposal costs one human
       click, not one corrupted row.</p>
+      {# Name by name from the MCP registry, not by hand: the hand-written copy
+         said six while seven tools were registered, and this page is public. #}
       <p><strong>MCP.</strong> Streamable HTTP (stateless) mounted at
-      <code>/mcp</code>, six tools: <code>search_grants</code>,
-      <code>get_grant</code>, <code>upcoming_deadlines</code>,
-      <code>list_proposals</code>, <code>propose_grant</code>,
-      <code>propose_update</code>. Auth via <code>X-API-Key</code> header or —
+      <code>/mcp</code>, {{ mcp_tools|length }} tools:
+      {% for name in mcp_tools %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+      Auth via <code>X-API-Key</code> header or —
       for clients that can't send headers — a capability URL
       <code>/mcp/k/{key}</code>: a middleware validates the key against the
       same revocable table and rewrites the path, so the MCP app itself stays

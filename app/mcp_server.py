@@ -1,8 +1,13 @@
 """MCP surface for Ono (and any MCP client). Auth is enforced upstream by the
 capability-URL middleware in main.py — tools here assume an authenticated caller.
 
-Tools: search_grants, get_grant, upcoming_deadlines, list_proposals,
-propose_grant, propose_update. Proposal approval is deliberately NOT exposed."""
+Every tool is the function right below its `@mcp.tool()` in this file, and the
+list of them is `tool_names()`, read off the registry. It is not written out
+here on purpose: the landing page and the README both quote it, and a list kept
+by hand goes stale silently — it said six tools while seven were registered,
+with `list_sources` missing from the copy on a public page.
+
+Proposal approval is deliberately NOT exposed on this surface."""
 import json
 
 from mcp.server import MCPServer
@@ -17,6 +22,15 @@ mcp = MCPServer(
         "and file proposals (new grants or updates) that a human reviews in the web UI."
     ),
 )
+
+
+def tool_names() -> list[str]:
+    """The tools actually registered on this server, in registration order.
+
+    Whatever quotes the tool list — the landing's geek mode today — asks here
+    instead of spelling it out, so adding a tool updates the copy and cannot
+    leave a public page claiming a number that is one short."""
+    return [t.name for t in mcp._tool_manager.list_tools()]
 
 
 def build_asgi_app():
@@ -37,17 +51,23 @@ def search_grants(
     primary_type: str = "",
     status: str = "open",
 ) -> str:
-    """Search tracked grants. q matches name/scope/notes (substring); funder
-    filters exactly; primary_type filters exactly (e.g. Project, Postdoc, PI,
-    Network, PhD, Other) or pass 'none' to match grants with no type set.
-    status is deadline-aware: 'open' = status open AND deadline in the future
-    or absent; 'expired' = status open but deadline passed; 'closed'/'archived'
-    = manual states; '' = any. Returns a JSON list sorted by next deadline."""
+    """Search tracked grants. q is a substring matched against name, scope,
+    notes and funder — the same four fields as the search box in the web UI;
+    funder additionally filters exactly; primary_type filters exactly (e.g.
+    Project, Postdoc, PI, Network, PhD, Other) or pass 'none' to match grants
+    with no type set. status is deadline-aware: 'open' = status open AND
+    deadline in the future or absent; 'expired' = status open but deadline
+    passed; 'closed'/'archived' = manual states; '' = any. Returns a JSON list
+    sorted by next deadline."""
+    # The four fields are the web UI's, not a shorter set of their own: one
+    # filter with two behaviours means a search someone learned in the table
+    # quietly loses results when the same words are typed in a chat. The web
+    # behaviour wins because it is the one already learned.
     sql = "SELECT * FROM grants WHERE 1=1"
     args: list = []
     if q:
-        sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ?)"
-        args += [f"%{q}%"] * 3
+        sql += " AND (name LIKE ? OR scope LIKE ? OR notes LIKE ? OR funder LIKE ?)"
+        args += [f"%{q}%"] * 4
     if funder:
         sql += " AND funder = ?"
         args.append(funder)

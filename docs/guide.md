@@ -77,7 +77,7 @@ What Approve does depends on the kind:
 - **update** — writes only the fields in the payload onto the existing row, and lets the row inherit the proposal's source if it had none.
 - **flag** — writes nothing at all. Approving a flag acknowledges it; the decision it points at (edit the link, close the scheme, ignore it) is a separate action of yours.
 
-Reject writes nothing, ever. Decided proposals are never deleted and stay readable under the *approved* and *rejected* filters — that is the tool's audit log, and the only place where the reason for a change is recorded.
+Reject writes nothing, ever. A decided proposal is never rewritten and stays readable under the *approved* and *rejected* filters — that is the tool's trail, and the only place where the reason for a change is recorded. One thing does remove it: deleting the grant deletes its proposals too (§3), so `archived` is what keeps the trail of a scheme that is over.
 
 One consequence to know: rejecting is not a blacklist. Duplicate suppression looks only at what is still pending, so a call you rejected as out of scope can be proposed again by a later sweep. If you never want to see it again, the durable fix is a hint on the source that excludes it.
 
