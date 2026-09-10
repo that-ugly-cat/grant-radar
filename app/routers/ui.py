@@ -26,9 +26,13 @@ templates.env.globals["commit"] = commit_hash()
 
 def _render(request: Request, name: str, **ctx) -> HTMLResponse:
     ctx.setdefault("user", get_user_or_none(request))
-    with get_db() as db:
-        ctx.setdefault("pending_count", db.execute(
-            "SELECT COUNT(*) AS n FROM proposals WHERE status='pending'").fetchone()["n"])
+    # Only when the caller has not answered it already: the showcase passes both
+    # of these explicitly, so a public page neither identifies its reader nor
+    # runs a query for a number it does not print.
+    if "pending_count" not in ctx:
+        with get_db() as db:
+            ctx["pending_count"] = db.execute(
+                "SELECT COUNT(*) AS n FROM proposals WHERE status='pending'").fetchone()["n"]
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -57,7 +61,14 @@ def guide(request: Request):
 def landing(request: Request):
     # The tool list comes from the MCP registry, so the page cannot go on
     # claiming a number the code has since outgrown.
-    return _render(request, "landing.html", mcp_tools=tool_names())
+    #
+    # user=None is the rule and not an omission: on the public branch of the
+    # reverse proxy the X-Borant-* headers are stripped by construction, so a
+    # branch on the reader is always false behind the gate and sometimes true
+    # without one — the same page with two behaviours. By not asking, this page
+    # is identical in both modes.
+    return _render(request, "landing.html", mcp_tools=tool_names(),
+                   user=None, pending_count=None)
 
 
 # --- auth ---

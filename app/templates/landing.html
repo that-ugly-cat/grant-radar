@@ -93,8 +93,11 @@ human has read the diff and clicked approve.
       {# Name by name from the MCP registry, not by hand: the hand-written copy
          said six while seven tools were registered, and this page is public. #}
       <p><strong>MCP.</strong> Streamable HTTP (stateless) mounted at
-      <code>/mcp</code>, {{ mcp_tools|length }} tools:
-      {% for name in mcp_tools %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+      <code>/mcp</code>{% if mcp_tools %}, {{ mcp_tools|length }} tools:
+      {% for name in mcp_tools %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.
+      {# No list rather than a wrong one: the enumeration comes from a private
+         attribute of the mcp library, and if a future version renames it the
+         sentence loses its tail instead of claiming zero tools. #}
       Auth via <code>X-API-Key</code> header or —
       for clients that can't send headers — a capability URL
       <code>/mcp/k/{key}</code>: a middleware validates the key against the

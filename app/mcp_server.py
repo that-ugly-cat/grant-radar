@@ -30,7 +30,14 @@ def tool_names() -> list[str]:
     Whatever quotes the tool list — the landing's geek mode today — asks here
     instead of spelling it out, so adding a tool updates the copy and cannot
     leave a public page claiming a number that is one short."""
-    return [t.name for t in mcp._tool_manager.list_tools()]
+    # `_tool_manager` is private: there is no public *sync* accessor, and the
+    # landing route that needs this is sync. A future version of `mcp` renaming
+    # it would otherwise take the public showcase down with it — so a failure
+    # here costs the enumeration, not the page.
+    try:
+        return [t.name for t in mcp._tool_manager.list_tools()]
+    except Exception:
+        return []
 
 
 def build_asgi_app():
