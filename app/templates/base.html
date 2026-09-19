@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Grant Radar — grantradar.borant.eu{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css?v={{ commit }}">
+  <script>
+    // Runs before the first paint, so a user who chose light never sees a dark
+    // frame. Kept inline and tiny on purpose: an external file would load too
+    // late. The toggle itself is in theme.js.
+    (function () {
+      try {
+        if (window.localStorage.getItem("grantradar-theme") === "light") {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/static/htmx.min.js?v={{ commit }}" defer></script>
 </head>
 <body>
@@ -24,6 +36,7 @@
          path gated, che funziona sia col gate davanti sia senza. #}
       <a href="/app">enter</a>
     {% endif %}
+    <button type="button" class="theme-toggle" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><span class="theme-icon-dark" aria-hidden="true">&#9788;</span><span class="theme-icon-light" aria-hidden="true">&#9790;</span></button>
   </nav>
 </header>
 <main>
@@ -36,5 +49,6 @@
   · discovery by <a href="https://www.anthropic.com">Claude</a> with server-side web search,
   approval by humans · a <a href="https://borant.eu">borant</a> tool
 </footer>
+<script src="/static/theme.js?v={{ commit }}"></script>
 </body>
 </html>
