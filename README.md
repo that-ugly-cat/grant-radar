@@ -38,12 +38,33 @@ touching your data.
 ## Run
 
 ```bash
-cp .env.example .env   # set ANTHROPIC_API_KEY, JWT_SECRET, ADMIN_PASSWORD
+cp .env.example .env   # set JWT_SECRET (or GR_SECRET_KEY) and ADMIN_PASSWORD
 docker compose up --build -d
 ```
 
 App on `127.0.0.1:8015`, DB persisted in `./data/`. First start creates the
 admin user from `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+
+### Workspaces, and whose key pays
+
+Grants, sources and proposals belong to a **workspace** and to one only
+(`app/workspaces.py`). Personal workspaces are created on first sign-in; shared
+ones by a platform admin at `/admin`. Roles are per workspace: `read`, `write`,
+`admin`; a workspace that is not the caller's answers 404 on every surface.
+
+There is **no server-wide Anthropic key**. Each user saves their own under
+their name in the header; it is stored encrypted with a key derived from
+`GR_SECRET_KEY` (falling back to `JWT_SECRET`), so changing that secret makes
+the stored keys unreadable and they have to be entered again. A workspace
+names one of its admins as the payer, and scans and checks run on that
+person's key. No key, no scan.
+
+The first start after upgrading from a pre-workspace database migrates it once:
+everything becomes the first admin's personal workspace, every other user gets
+an empty personal one, and the whole content is copied into a shared workspace
+`IBME` where the other active users become readers. If `ANTHROPIC_API_KEY` is
+still in the environment at that moment it is adopted as the first admin's key,
+so scans do not stop; it can then be removed from `.env`.
 
 ### Seed from CSV
 
@@ -97,9 +118,10 @@ Three things that do not change in `gateway`:
   `local` a working way home. A user who only ever arrived through the gate is
   given a random local password nobody knows; an admin can set a real one from
   `/admin`.
-- **A role that spends is never provisioned quietly.** `POST /scan-now` and
-  `POST /grants/{id}/check` draw on the server's Anthropic key with no
-  per-user ceiling, and `admin` is the role that reaches them. The gate's
+- **The platform role is never provisioned quietly.** `admin` in the users
+  table is the platform role: it creates shared workspaces and manages
+  accounts. It no longer spends anything — scans run on the payer's own key —
+  but it is still granted out loud. The gate's
   `X-Borant-Hint` may carry `admin` and it is honoured — but only at profile
   creation, only from the trusted proxy, and only with a warning naming the
   address and the subject. An unrecognised hint is treated as a typo and falls
@@ -135,10 +157,10 @@ points there — not at `/login`, which on a page that can never recognise anyon
 would close a loop with no way in, and not at the gate's own URL, which would
 work and would wire Borant ID into an app that must keep running without it.
 
-**The role hint is honoured**, with a vocabulary of `reader, admin`. `admin`
-reaches `POST /scan-now` and `POST /grants/{id}/check`, both of which spend on
-the server's Anthropic key with no per-user ceiling, so granting it this way is
-logged loudly. An unrecognised hint is a typo, not a role, and falls back to
+**The role hint is honoured**, with a vocabulary of `reader, admin`. It sets the
+platform role only; roles inside a workspace are given by that workspace's
+admins and the gate has no say in them. Granting `admin` this way is logged
+loudly. An unrecognised hint is a typo, not a role, and falls back to
 `reader`. `/grants` is a permanent redirect to `/app` that carries its query
 string, so filtered bookmarks keep working.
 

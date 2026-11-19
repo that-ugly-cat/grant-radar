@@ -288,8 +288,8 @@ td.actions-inline { text-align: right; }
 
 /* filters: the search field takes the slack, no select grows past its share */
 .grant-filters { flex: 1 1 28rem; }
-.grant-filters input[type="search"] { flex: 1 1 11rem; min-width: 9rem; }
-.grant-filters select { flex: 0 1 11rem; min-width: 0; max-width: 13rem; text-overflow: ellipsis; }
+.grant-filters input[type="search"] { flex: 1 1 9rem; min-width: 8rem; }
+.grant-filters select { flex: 0 1 9.2rem; min-width: 0; max-width: 13rem; text-overflow: ellipsis; }
 
 @media (max-width: 900px) {
   .tagline-top { display: none; }
@@ -353,3 +353,11 @@ td.actions-inline { text-align: right; }
   table.diff col.c-field { width: 5.5rem; }
   .proposal-head .when { margin-left: 0; flex-basis: 100%; }
 }
+
+/* workspaces */
+.ws-switch { width: auto; max-width: 13rem; padding: 0.2rem 0.5rem; font-size: 0.82rem; font-weight: 700; }
+.ws-name { font-weight: 700; color: var(--fg); }
+label.check { display: flex; align-items: center; gap: 0.5rem; }
+label.check input { width: auto; }
+.card h2 + p { margin-top: 0; }
+@media (max-width: 700px) { .ws-switch { max-width: none; width: 100%; } }

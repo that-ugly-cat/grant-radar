@@ -51,11 +51,12 @@ def _already_flagged_dead(db, grant_id: int, link: str, last_ok_at) -> bool:
 def _file_flag(db, grant_id: int, rationale: str, source_url: str) -> bool:
     if _pending_flag_exists(db, grant_id):
         return False
-    src = db.execute("SELECT source_id FROM grants WHERE id=?", (grant_id,)).fetchone()
+    src = db.execute("SELECT source_id, workspace_id FROM grants WHERE id=?", (grant_id,)).fetchone()
     db.execute(
-        "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
-        "VALUES ('flag', ?, ?, ?, ?, ?, 'high', 'link_monitor')",
-        (grant_id, src["source_id"] if src else None, json.dumps({}), rationale, source_url),
+        "INSERT INTO proposals (kind, grant_id, source_id, workspace_id, payload, rationale, source_url, "
+        "confidence, method) VALUES ('flag', ?, ?, ?, ?, ?, ?, 'high', 'link_monitor')",
+        (grant_id, src["source_id"] if src else None, src["workspace_id"] if src else None,
+         json.dumps({}), rationale, source_url),
     )
     return True
 
@@ -103,15 +104,19 @@ def _record(db, g, new_hash: str | None) -> str:
     return "dead"
 
 
-def run_link_monitor() -> dict:
-    """Returns a small summary dict; safe to call from scheduler or UI."""
+def run_link_monitor(workspace_id: int | None = None) -> dict:
+    """Check every workspace's links (the nightly job), or one workspace's.
+    Returns a small summary dict; safe to call from scheduler or UI."""
     counts = {"ok": 0, "changed": 0, "failing": 0, "dead": 0}
     with get_db() as db:
         # Closed and archived rows are skipped: nobody acts on their page.
-        grants = db.execute(
-            "SELECT id, link, content_hash, link_fail_count, link_last_ok_at FROM grants "
-            "WHERE link IS NOT NULL AND link != '' AND status = 'open'"
-        ).fetchall()
+        sql = ("SELECT id, link, content_hash, link_fail_count, link_last_ok_at FROM grants "
+               "WHERE link IS NOT NULL AND link != '' AND status = 'open'")
+        args = []
+        if workspace_id:
+            sql += " AND workspace_id = ?"
+            args.append(workspace_id)
+        grants = db.execute(sql, args).fetchall()
 
     with httpx.Client(timeout=TIMEOUT, headers=HEADERS, follow_redirects=True) as client:
         for g in grants:

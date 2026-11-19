@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ ws.name }} <span class="chip">{{ ws.kind }}</span> <span class="chip kind">you: {{ ws.role }}</span></h1>
+{% set notice = request.query_params.get('notice') %}
+{% if notice == 'saved' %}<div class="card highlight small">Saved.</div>
+{% elif notice == 'last_admin' %}<div class="error">Not done: that would leave the workspace without an admin.</div>{% endif %}
+
+<div class="card">
+  <h2>Research interests</h2>
+  <p class="small muted">The scan reads this text and nothing else to decide what is relevant here. It rates every call it finds as <strong>high</strong>, <strong>medium</strong> or <strong>low</strong> fit against it — separately from how well it could verify the facts. Say who the group is, where it is based, what it works on, and what it is not interested in.</p>
+  <form method="post" action="{{ base }}/settings">
+    {% if ws.kind == 'shared' %}<label>Name <input name="name" value="{{ ws.name }}" {% if not can_admin %}disabled{% endif %}></label>{% endif %}
+    <label>Profile <textarea name="profile" rows="7" {% if not can_admin %}disabled{% endif %}>{{ ws.profile or '' }}</textarea></label>
+
+    <h2>Scans</h2>
+    <label class="check"><input type="checkbox" name="auto_scan" value="1" {% if ws.auto_scan %}checked{% endif %} {% if not can_admin %}disabled{% endif %}> Take part in the monthly scan (first of the month)</label>
+    <label>Paid by
+      <select name="payer_user_id" {% if not can_admin %}disabled{% endif %}>
+        {% for m in members if m.role == 'admin' %}<option value="{{ m.id }}" {% if m.id == ws.payer_user_id %}selected{% endif %}>{{ m.username }}{% if not m.has_key %} — no Anthropic key saved{% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <p class="small muted">Scans and checks call the Anthropic API with the key of this admin, who is billed for them. The key is saved by its owner under their own name, in the header, and nobody else can read it. {% if payer and not payer.has_key %}<strong>{{ payer.username }} has no key saved: nothing is scanned until there is one.</strong>{% endif %}</p>
+    {% if can_admin %}<div class="actions"><button type="submit">Save</button></div>{% endif %}
+  </form>
+</div>
+
+<div class="card">
+  <h2>Members</h2>
+  {% if ws.kind == 'personal' %}
+  <p class="small muted">This is a personal workspace: it has one member. To show grants to other people, copy them into a shared workspace from a grant's detail card.</p>
+  {% else %}
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>User</th><th>Email</th><th>Role</th>{% if can_admin %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td class="cell-name"><strong>{{ m.username }}</strong>{% if m.id == ws.payer_user_id %} <span class="chip">pays</span>{% endif %}</td>
+        <td data-label="Email" class="break">{{ m.email }}</td>
+        <td data-label="Role">
+          {% if can_admin %}
+          <form method="post" action="{{ base }}/members" class="inline-form">
+            <input type="hidden" name="user_id" value="{{ m.id }}">
+            <select name="role" aria-label="Role of {{ m.username }}">{% for r in ['read','write','admin'] %}<option value="{{ r }}" {% if m.role == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+            <button class="small" type="submit">set</button>
+          </form>
+          {% else %}{{ m.role }}{% endif %}
+        </td>
+        {% if can_admin %}<td class="actions-inline"><form method="post" action="{{ base }}/members/{{ m.id }}/remove" onsubmit="return confirm('Remove {{ m.username }} from {{ ws.name }}?')"><button class="small danger" type="submit">remove</button></form></td>{% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="small muted"><strong>read</strong> sees the table and the queue. <strong>write</strong> edits grants, decides proposals and runs a check on a grant. <strong>admin</strong> manages sources, scans, these settings and the members.</p>
+  {% if can_admin %}
+  <h3>Add a member</h3>
+  {% if candidates %}
+  <form method="post" action="{{ base }}/members" class="inline-form">
+    <select name="user_id" aria-label="User" required>{% for u in candidates %}<option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>{% endfor %}</select>
+    <select name="role" aria-label="Role">{% for r in ['read','write','admin'] %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select>
+    <button type="submit">Add</button>
+  </form>
+  {% else %}<p class="small muted">Everyone with an account is already a member.</p>{% endif %}
+  <p class="small muted">Only people who already have an account appear here. An account is created the first time someone signs in.</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

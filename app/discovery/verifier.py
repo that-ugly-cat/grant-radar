@@ -8,7 +8,8 @@ from datetime import date
 
 import anthropic
 
-from ..db import clean_proposal_fields, get_db
+from ..db import DEFAULT_PROFILE, clean_proposal_fields, get_db
+from ..workspaces import payer_key, workspace_by_id
 from .scanner import MODEL, _FIELD_PROPS
 
 MAX_TURNS = 6
@@ -63,17 +64,21 @@ it when the stored value is null or wrong. A row with recurring="no" is closed a
 deadline has passed.
 - A scheme that was discontinued, or whose last call closed with no next edition -> propose \
 status="closed" and recurring="no". A closed row with a new call -> status="open" and the new deadline.
+- fit ("high", "medium" or "low") says how well the scheme matches the RESEARCH PROFILE in the \
+user message; it is not about how sure you are of the facts. Propose it when the stored value is null.
 - If everything checks out, matches=true with empty changes.
 - Call submit_verification exactly once when done."""
 
 
-def _user_prompt(grant: dict) -> str:
+def _user_prompt(grant: dict, workspace: dict | None = None) -> str:
     record = {k: grant.get(k) for k in ["id", "name", "funder", "scope", "max_amount",
                                         "duration_months", "deadline", "deadline_date",
                                         "deadline_logic", "link", "notes", "grant_start",
-                                        "primary_type", "status", "recurring"]}
+                                        "primary_type", "status", "recurring", "fit"]}
+    profile = ((workspace or {}).get("profile") or "").strip() or DEFAULT_PROFILE
     return (
         f"Today is {date.today().isoformat()}.\n\n"
+        f"RESEARCH PROFILE\n{profile}\n\n"
         f"STORED RECORD (JSON):\n{json.dumps(record, ensure_ascii=False, default=str)}"
     )
 
@@ -94,9 +99,10 @@ def _apply_result(grant: dict, result: dict) -> dict:
                       (grant["id"],)).fetchone():
             return {"grant": grant["name"], "outcome": "pending_exists", "changes": len(fields)}
         db.execute(
-            "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
-            "VALUES ('update', ?, ?, ?, ?, ?, ?, 'llm_check')",
-            (grant["id"], grant.get("source_id"), json.dumps(fields, ensure_ascii=False),
+            "INSERT INTO proposals (kind, grant_id, source_id, workspace_id, payload, rationale, source_url, "
+            "confidence, method) VALUES ('update', ?, ?, ?, ?, ?, ?, ?, 'llm_check')",
+            (grant["id"], grant.get("source_id"), grant.get("workspace_id"),
+             json.dumps(fields, ensure_ascii=False),
              result.get("rationale", ""), result.get("source_url", ""),
              result.get("confidence", "medium")),
         )
@@ -109,9 +115,14 @@ def verify_grant(grant_id: int) -> dict:
     if not row:
         return {"outcome": "error", "detail": f"grant {grant_id} not found"}
     grant = dict(row)
+    workspace = workspace_by_id(grant["workspace_id"]) if grant.get("workspace_id") else None
+    api_key = payer_key(workspace) if workspace else None
+    if not api_key:
+        return {"grant": grant["name"], "outcome": "error",
+                "detail": "no_api_key: the workspace's payer has no Anthropic key"}
 
-    client = anthropic.Anthropic()
-    messages = [{"role": "user", "content": _user_prompt(grant)}]
+    client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": _user_prompt(grant, workspace)}]
     result = None
     try:
         for _ in range(MAX_TURNS):

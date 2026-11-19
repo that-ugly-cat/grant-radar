@@ -60,8 +60,10 @@ BORANT_LOGOUT_URL = os.environ.get("BORANT_LOGOUT_URL", "https://id.borant.eu/lo
 # The gate's X-Borant-Hint is a suggestion, honoured only at profile creation
 # and never again. Both of this app's roles are accepted, which is a deliberate
 # departure from the house rule that an app must not provision a role that can
-# spend — `admin` unlocks POST /scan-now and POST /grants/{id}/check, both of
-# which draw on the server's Anthropic key with no per-user ceiling in the path.
+# spend. Since November 2026 that reason is gone: scans run on the Anthropic
+# key of the workspace's payer, never on a key of the server's, so no role
+# spends anybody else's money. `admin` here is the platform role — it creates
+# shared workspaces and manages accounts — and it is still said out loud.
 #
 # The reason it is safe here and was not elsewhere: the rule was written for an
 # app with open registration, where the hint carries what the *applicant* asked
@@ -121,8 +123,8 @@ def _role_from_hint(hint: str, email: str, sub: str) -> str:
         return DEFAULT_ROLE
     if hint in SPENDING_ROLES:
         log.warning("gateway: provisioning %s (%s) as %r on the gate's hint. "
-                    "That role can start a scan and a verify, both of which "
-                    "spend on ANTHROPIC_API_KEY with no per-user ceiling. "
+                    "That is the platform role: it creates shared workspaces "
+                    "and manages every account. "
                     "Revoke from /admin if this was not deliberate.",
                     email, sub, hint)
     return hint
@@ -244,15 +246,27 @@ def new_api_key() -> str:
     return secrets.token_urlsafe(24)
 
 
-def check_api_key(key: str) -> bool:
+def user_for_api_key(key: str) -> dict | None:
+    """The user an API key speaks for, in the shape a session has, or None.
+
+    A key belongs to one person and reaches what that person's memberships
+    reach, with their role in each workspace. A key whose owner was
+    deactivated stops working with them."""
     if not key:
-        return False
+        return None
     with get_db() as db:
-        row = db.execute("SELECT id FROM api_keys WHERE key = ? AND active = 1", (key,)).fetchone()
+        row = db.execute(
+            "SELECT k.id AS key_id, u.id, u.username, u.role FROM api_keys k "
+            "JOIN users u ON u.id = k.user_id "
+            "WHERE k.key = ? AND k.active = 1 AND u.active = 1", (key,)).fetchone()
         if not row:
-            return False
-        db.execute("UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?", (row["id"],))
-    return True
+            return None
+        db.execute("UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?", (row["key_id"],))
+    return {"sub": str(row["id"]), "username": row["username"], "role": row["role"]}
+
+
+def check_api_key(key: str) -> bool:
+    return user_for_api_key(key) is not None
 
 
 def bootstrap_admin() -> None:

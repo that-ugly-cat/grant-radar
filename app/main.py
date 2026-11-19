@@ -19,11 +19,12 @@ from fastapi.staticfiles import StaticFiles
 
 import os
 
-from .auth import AUTH_MODE, bootstrap_admin, check_api_key, gateway_mode
+from .auth import AUTH_MODE, bootstrap_admin, gateway_mode, user_for_api_key
 from .db import auto_close_expired, init_db
 from .discovery.link_monitor import run_link_monitor
-from .discovery.scanner import run_scan
-from .mcp_server import build_asgi_app, mcp
+from .discovery.scanner import run_all_scans
+from .mcp_server import build_asgi_app, current_user, mcp
+from .workspaces import migrate_to_workspaces
 from .routers import api, ui
 
 scheduler = BackgroundScheduler(timezone="Europe/Zurich")
@@ -33,6 +34,7 @@ scheduler = BackgroundScheduler(timezone="Europe/Zurich")
 async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
+    migrate_to_workspaces()
     if os.environ.get("GR_SCHEDULER", "1") == "1":
         # One-off calls past their deadline close by themselves: now, so a
         # redeploy does not wait for the night, and then every night before
@@ -41,7 +43,7 @@ async def lifespan(app: FastAPI):
         scheduler.add_job(auto_close_expired, CronTrigger(hour=2, minute=50), id="auto_close")
         scheduler.add_job(run_link_monitor, CronTrigger(hour=3, minute=0), id="link_monitor")
         # Scansione semantica mensile: primo del mese, 04:00.
-        scheduler.add_job(run_scan, CronTrigger(day=1, hour=4, minute=0), id="llm_scan")
+        scheduler.add_job(run_all_scans, CronTrigger(day=1, hour=4, minute=0), id="llm_scan")
         scheduler.start()
     async with mcp.session_manager.run():
         yield
@@ -110,12 +112,18 @@ async def mcp_auth(request: Request, call_next):
         if path.startswith("/mcp/k/"):
             rest = path[len("/mcp/k/"):]
             key, _, tail = rest.partition("/")
-            if not check_api_key(key):
+            user = user_for_api_key(key)
+            if not user:
                 return JSONResponse({"error": "invalid key"}, status_code=401)
             # Riscrivi il path: l'app MCP non sa nulla dell'autenticazione.
             request.scope["path"] = f"/mcp/{tail}"
-        elif not check_api_key(request.headers.get("x-api-key", "")):
-            return JSONResponse({"error": "missing or invalid X-API-Key"}, status_code=401)
+        else:
+            user = user_for_api_key(request.headers.get("x-api-key", ""))
+            if not user:
+                return JSONResponse({"error": "missing or invalid X-API-Key"}, status_code=401)
+        # The tools ask this who is calling: a key is a person, and what a tool
+        # may touch is that person's memberships.
+        current_user.set(user)
         # Senza slash finale il mount risponderebbe 307, che i client MCP non seguono.
         if request.scope["path"] == "/mcp":
             request.scope["path"] = "/mcp/"

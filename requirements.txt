@@ -10,3 +10,4 @@ PyJWT>=2.8
 APScheduler>=3.10
 openpyxl>=3.1
 markdown
+cryptography

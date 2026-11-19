@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% block main_class %}wide{% endblock %}
 {% block content %}
-{% if request.query_params.get('checked') %}
+{% set notice = request.query_params.get('notice') %}
+{% if notice == 'checked' %}
 <div class="card highlight small">Check started — takes a minute or two. Differences land in
-  <a href="/proposals">Proposals</a>; if everything matches, the grant gets a "LLM check" timestamp (see its detail).</div>
+  <a href="{{ base }}/proposals">Proposals</a>; if everything matches, the grant gets a "LLM check" timestamp (see its detail).</div>
+{% elif notice == 'nokey' %}
+<div class="card highlight small">No check was run: scans and checks in {{ ws.name }} run on the Anthropic key of its paying admin, and there is none saved. See <a href="{{ base }}/settings">settings</a>.</div>
+{% elif notice == 'copied' %}
+<div class="card highlight small">Copied to {{ request.query_params.get('to') }}.</div>
 {% endif %}
 <div class="toolbar">
-  <form class="filters grant-filters" hx-get="/app" hx-target="#grants-table" hx-push-url="true"
+  <form class="filters grant-filters" hx-get="{{ base }}/app" hx-target="#grants-table" hx-push-url="true"
         hx-trigger="change, keyup changed delay:400ms from:input">
     <input type="search" name="q" value="{{ q }}" placeholder="Search…">
     <select name="funder" aria-label="Funder">
@@ -24,12 +29,17 @@
       {% for s in sources %}<option value="{{ s.id }}" {% if f_source == s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
       <option value="__none__" {% if f_source == '__none__' %}selected{% endif %}>(no source)</option>
     </select>
+    <select name="fit" aria-label="Fit">
+      <option value="">Fit: all</option>
+      {% for f in ['high','medium','low'] %}<option value="{{ f }}" {% if f == f_fit %}selected{% endif %}>Fit: {{ f }}</option>{% endfor %}
+      <option value="__none__" {% if f_fit == '__none__' %}selected{% endif %}>(not rated)</option>
+    </select>
     <select name="status" aria-label="Status">
       {% for s in ['open','expired','closed','archived'] %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>Status: {{ s }}</option>{% endfor %}
       <option value="" {% if not f_status %}selected{% endif %}>Status: all</option>
     </select>
   </form>
-  {% if user.role == 'admin' %}<a class="btn" href="/grants/new">+ New grant</a>{% endif %}
+  {% if can_write %}<a class="btn" href="{{ base }}/grants/new">+ New grant</a>{% endif %}
 </div>
 <div id="grants-table">
   {% include "_grants_table.html" %}

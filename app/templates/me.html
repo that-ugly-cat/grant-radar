@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ user.username }}</h1>
+{% if notice == 'key_saved' %}<div class="card highlight small">Anthropic key saved.</div>
+{% elif notice == 'key_removed' %}<div class="card highlight small">Anthropic key removed.</div>
+{% elif notice == 'no_secret' %}<div class="error">Nothing was saved: this server has no <code>GR_SECRET_KEY</code> or <code>JWT_SECRET</code> to encrypt keys with. Its operator has to set one.</div>
+{% elif notice == 'bad_key' %}<div class="error">That does not look like an Anthropic API key (they start with <code>sk-ant-</code>). Nothing was saved.</div>{% endif %}
+
+{% if new_key %}
+<div class="card highlight">
+  <strong>New API key (shown only once — save it now):</strong>
+  <code class="key">{{ new_key }}</code>
+  <p class="small muted">Header: <code>X-API-Key: {{ new_key }}</code> — MCP capability URL: <code>/mcp/k/{{ new_key }}</code></p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Your workspaces</h2>
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>Workspace</th><th>Kind</th><th>Your role</th></tr></thead>
+    <tbody>
+      {% for w in workspaces %}
+      <tr><td class="cell-name"><a href="/w/{{ w.slug }}/app"><strong>{{ w.name }}</strong></a></td><td data-label="Kind">{{ w.kind }}</td><td data-label="Role">{{ w.role }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Your Anthropic key</h2>
+  <p class="small muted">Scans and checks call the Anthropic API, and each workspace bills them to one of its admins. This is the key used when that admin is you{% if paying %}: today for {% for p in paying %}<a href="/w/{{ p.slug }}/settings">{{ p.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}. It is stored encrypted, never shown again, and never sent to anyone but Anthropic.</p>
+  <p>{% if key_hint %}Saved: <code>{{ key_hint }}</code>{% else %}<span class="muted">No key saved: workspaces you pay for are not scanned.</span>{% endif %}</p>
+  <form method="post" action="/me/anthropic-key" class="inline-form">
+    <input name="key" type="password" placeholder="sk-ant-…" autocomplete="off" required>
+    <button type="submit">{{ 'Replace' if key_hint else 'Save' }}</button>
+  </form>
+  {% if key_hint %}
+  <form method="post" action="/me/anthropic-key" onsubmit="return confirm('Remove your Anthropic key? Workspaces you pay for will stop being scanned.')">
+    <input type="hidden" name="key" value="">
+    <button class="small danger" type="submit">Remove key</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Your API keys (REST + MCP)</h2>
+  <p class="small muted">A key speaks for you: it reaches the workspaces you are a member of, with your role in each. Revoking it closes all of them at once.</p>
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>Label</th><th>Key</th><th>Created</th><th>Last used</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+      {% for k in api_keys %}
+      <tr>
+        <td class="cell-name"><strong>{{ k.label }}</strong></td>
+        <td data-label="Key"><code>{{ k.key[:6] }}…{{ k.key[-4:] }}</code></td>
+        <td data-label="Created" class="small">{{ k.created_at }}</td>
+        <td data-label="Last used" class="small">{{ k.last_used_at or 'never' }}</td>
+        <td data-label="Active">{{ '✓' if k.active else '—' }}</td>
+        <td>{% if k.active %}<form method="post" action="/me/keys/{{ k.id }}/revoke" onsubmit="return confirm('Revoke this key?')"><button class="small danger" type="submit">revoke</button></form>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr class="empty"><td colspan="6" class="muted">No keys yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <h3>New key</h3>
+  <form method="post" action="/me/keys/new" class="inline-form">
+    <input name="label" placeholder="label (e.g. ono-desktop)" required>
+    <button type="submit">Generate</button>
+  </form>
+</div>
+{% endblock %}

@@ -9,7 +9,8 @@ from datetime import date
 
 import anthropic
 
-from ..db import clean_proposal_fields, get_db, grants_digest, GRANT_FIELDS
+from ..db import DEFAULT_PROFILE, clean_proposal_fields, get_db, grants_digest, GRANT_FIELDS
+from ..workspaces import payer_key, workspace_by_id
 
 MODEL = os.environ.get("GR_MODEL", "claude-opus-5")
 MAX_TURNS = 8
@@ -18,7 +19,8 @@ MAX_WEB_SEARCHES = 12
 # Structured proposals arrive via a strict client tool: web search + strict tool
 # use are compatible, and validation happens at the tool-call layer.
 # Strict schemas cap the number of union-typed parameters at 16: twelve
-# descriptive fields plus these two leave room for two more, not for a dozen.
+# descriptive fields plus these three and grant_id make sixteen. There is no
+# room for one more nullable field without making an existing one required.
 _FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS}
 # No `enum` on these two: the API refuses an enum on a nullable string
 # ("Enum value 'open' does not match declared type"). The vocabulary is held by
@@ -27,6 +29,11 @@ _FIELD_PROPS["status"] = {
     "type": ["string", "null"],
     "description": "Exactly 'open' or 'closed', or null. closed = the scheme ended or this was "
                    "its last call; open = a closed row has a new call",
+}
+_FIELD_PROPS["fit"] = {
+    "type": ["string", "null"],
+    "description": "Exactly 'high', 'medium' or 'low', or null: how well the call matches the "
+                   "research interests in the profile. Not how sure you are of the facts.",
 }
 _FIELD_PROPS["recurring"] = {
     "type": ["string", "null"],
@@ -76,12 +83,12 @@ SUBMIT_TOOL = {
 
 WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_WEB_SEARCHES}
 
-SYSTEM = """You are the discovery engine of Grant Radar, a funding-opportunity tracker for an \
-academic institute of biomedical ethics (research areas: bioethics, digital health, AI ethics, \
-public health, empirical ethics; based in Zurich, Switzerland).
+SYSTEM = """You are the discovery engine of Grant Radar, a funding-opportunity tracker. You work \
+for one research group at a time; who they are and what they work on is the RESEARCH PROFILE in \
+the user message, and it is the only definition of relevance you have.
 
 Given one funding source and the digest of grants already tracked, use web search to find:
-1. NEW open or upcoming calls from this source that fit the research areas and are not in the digest.
+1. NEW open or upcoming calls from this source that fit the research profile and are not in the digest.
 2. UPDATES to tracked grants from this source: a new deadline for a recurring call, changed amounts, \
 a closed or discontinued scheme.
 
@@ -100,24 +107,34 @@ with status="closed" has a new call, propose status="open" together with the new
 leave rows with status closed or archived alone.
 - Skip calls that are clearly out of scope, closed with no next edition, or reserved to categories the \
 institute cannot apply to.
-- Be conservative: a wrong proposal costs review time. Use confidence=low when unsure.
+- Two separate judgements, never merged. confidence is about the FACTS: high when you read the \
+dates and conditions on the funder's own page, low when you inferred them or could not confirm them. \
+fit is about RELEVANCE to the research profile: "high" when the call's topic and eligibility match \
+what the group does, "medium" when it is adjacent or only part of it applies, "low" when it is a \
+stretch. A well-verified call that barely concerns the group is confidence=high, fit=low. Set fit on \
+every kind=new, say in the rationale what in the profile it matches, and propose it as an update for \
+digest rows where it is null.
+- Be conservative: a wrong proposal costs review time. Do not propose a new call you would rate \
+fit=low unless the source hints ask for that kind of call.
 - When done, call submit_proposals exactly once with all proposals (empty array if none)."""
 
 
-def _user_prompt(source: dict) -> str:
-    # Ogni source vede i propri grant più gli orfani non ancora mappati.
-    digest_rows = [g for g in grants_digest()
+def _user_prompt(source: dict, workspace: dict) -> str:
+    # Each source sees its own grants plus the workspace's orphans, never
+    # another workspace's rows.
+    digest_rows = [g for g in grants_digest(workspace["id"])
                    if g.get("source_id") in (source["id"], None)]
     digest = json.dumps(digest_rows, ensure_ascii=False, default=str)
     return (
         f"Today is {date.today().isoformat()}.\n\n"
+        f"RESEARCH PROFILE\n{(workspace.get('profile') or '').strip() or DEFAULT_PROFILE}\n\n"
         f"FUNDING SOURCE\nname: {source['name']}\nurl: {source['url'] or '(none)'}\n"
         f"hints: {source['hints'] or '(none)'}\n\n"
         f"TRACKED GRANTS DIGEST (JSON):\n{digest}"
     )
 
 
-def _duplicate_pending(db, kind: str, grant_id, name: str | None) -> bool:
+def _duplicate_pending(db, kind: str, grant_id, name: str | None, workspace_id: int) -> bool:
     if kind == "update" and grant_id:
         return db.execute(
             "SELECT id FROM proposals WHERE kind='update' AND grant_id=? AND status='pending'",
@@ -125,9 +142,9 @@ def _duplicate_pending(db, kind: str, grant_id, name: str | None) -> bool:
         ).fetchone() is not None
     if kind == "new" and name:
         return db.execute(
-            "SELECT id FROM proposals WHERE kind='new' AND status='pending' "
+            "SELECT id FROM proposals WHERE kind='new' AND status='pending' AND workspace_id=? "
             "AND json_extract(payload, '$.name') = ?",
-            (name,),
+            (workspace_id, name),
         ).fetchone() is not None
     return False
 
@@ -140,12 +157,18 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
             kind, grant_id = p.get("kind"), p.get("grant_id")
             if kind not in ("new", "update") or (kind == "update" and not grant_id):
                 continue
-            if _duplicate_pending(db, kind, grant_id, fields.get("name")):
+            ws_id = source["workspace_id"]
+            # The model only saw this workspace's rows, but an id it invents
+            # must not reach somebody else's grant.
+            if kind == "update" and not db.execute(
+                    "SELECT 1 FROM grants WHERE id=? AND workspace_id=?", (grant_id, ws_id)).fetchone():
+                continue
+            if _duplicate_pending(db, kind, grant_id, fields.get("name"), ws_id):
                 continue
             db.execute(
-                "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, 'llm_scan')",
-                (kind, grant_id if kind == "update" else None, source["id"],
+                "INSERT INTO proposals (kind, grant_id, source_id, workspace_id, payload, rationale, "
+                "source_url, confidence, method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'llm_scan')",
+                (kind, grant_id if kind == "update" else None, source["id"], ws_id,
                  json.dumps(fields, ensure_ascii=False),
                  p.get("rationale", ""), p.get("source_url", ""), p.get("confidence", "medium")),
             )
@@ -153,10 +176,10 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
     return stored
 
 
-def scan_source(source: dict) -> dict:
-    """One agentic loop over a single source. Returns a summary dict."""
-    client = anthropic.Anthropic()
-    messages = [{"role": "user", "content": _user_prompt(source)}]
+def scan_source(source: dict, workspace: dict, api_key: str) -> dict:
+    """One agentic loop over a single source, on the payer's key. Returns a summary dict."""
+    client = anthropic.Anthropic(api_key=api_key)
+    messages = [{"role": "user", "content": _user_prompt(source, workspace)}]
     tools = [WEB_SEARCH_TOOL, SUBMIT_TOOL]
     proposals = None
 
@@ -207,25 +230,53 @@ def scan_running() -> bool:
     return _scan_lock.locked()
 
 
-def run_scan(source_id: int | None = None) -> list[dict]:
-    """Scan one source or every enabled source. Called by the scheduler and by
-    'Scan now'. Returns at once, having done nothing, if a scan is running."""
+def run_scan(workspace_id: int, source_id: int | None = None) -> list[dict]:
+    """Scan one source of a workspace, or every enabled one. Called by 'Scan
+    now' and, through run_all_scans, by the scheduler. Returns at once, having
+    done nothing, if a scan is running anywhere in the app."""
     if not _scan_lock.acquire(blocking=False):
         print("[scan] skipped: another scan is already running")
         return []
     try:
-        return _run_scan(source_id)
+        return _run_scan(workspace_id, source_id)
     finally:
         _scan_lock.release()
 
 
-def _run_scan(source_id: int | None = None) -> list[dict]:
+def run_all_scans() -> None:
+    """The monthly job: every workspace that takes part, one after another."""
+    with get_db() as db:
+        ids = [r["id"] for r in db.execute("SELECT id FROM workspaces WHERE auto_scan=1 ORDER BY id")]
+    for ws_id in ids:
+        run_scan(ws_id)
+
+
+def _run_scan(workspace_id: int, source_id: int | None = None) -> list[dict]:
+    workspace = workspace_by_id(workspace_id)
+    if not workspace:
+        return []
     with get_db() as db:
         if source_id:
-            rows = db.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchall()
+            rows = db.execute("SELECT * FROM sources WHERE id=? AND workspace_id=?",
+                              (source_id, workspace_id)).fetchall()
         else:
-            rows = db.execute("SELECT * FROM sources WHERE enabled=1").fetchall()
+            rows = db.execute("SELECT * FROM sources WHERE enabled=1 AND workspace_id=?",
+                              (workspace_id,)).fetchall()
     sources = [dict(r) for r in rows]
+    if not sources:
+        return []
+
+    api_key = payer_key(workspace)
+    if not api_key:
+        # Nobody to bill: say so once, in the place the banner reads, and stop.
+        result = {"source": sources[0]["name"], "outcome": "error",
+                  "detail": "no_api_key: the workspace's payer has no Anthropic key, scan not run"}
+        with get_db() as db:
+            db.execute("INSERT INTO scan_log (source_id, finished_at, outcome, detail) "
+                       "VALUES (?, CURRENT_TIMESTAMP, 'error', ?)",
+                       (sources[0]["id"], json.dumps(result, ensure_ascii=False)))
+        print(f"[scan] {workspace['slug']}: {result}")
+        return [result]
 
     results = []
     auth_failed = False
@@ -237,7 +288,7 @@ def _run_scan(source_id: int | None = None) -> list[dict]:
                 "INSERT INTO scan_log (source_id) VALUES (?)", (source["id"],)
             ).lastrowid
         try:
-            result = scan_source(source)
+            result = scan_source(source, workspace, api_key)
         except anthropic.AuthenticationError as e:
             # A rejected key fails every source the same way: record it once
             # and stop, instead of logging the same 401 for each of them.
@@ -255,6 +306,6 @@ def _run_scan(source_id: int | None = None) -> list[dict]:
             )
             if result["outcome"] == "ok":
                 db.execute("UPDATE sources SET last_scanned_at=CURRENT_TIMESTAMP WHERE id=?", (source["id"],))
-        print(f"[scan] {result}")
+        print(f"[scan] {workspace['slug']}: {result}")
         results.append(result)
     return results

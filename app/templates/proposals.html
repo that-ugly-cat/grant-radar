@@ -4,7 +4,7 @@
   <h1>Proposals</h1>
   <div class="filters">
     {% for s in ['pending','approved','rejected'] %}
-    <a class="btn {% if f_status == s %}active{% endif %}" href="/proposals?status={{ s }}">{{ s }}</a>
+    <a class="btn {% if f_status == s %}active{% endif %}" href="{{ base }}/proposals?status={{ s }}">{{ s }}</a>
     {% endfor %}
   </div>
 </div>
@@ -42,10 +42,10 @@
   </table>
   </div>
   {% endif %}
-  {% if p.status == 'pending' and user.role == 'admin' %}
+  {% if p.status == 'pending' and can_write %}
   <div class="actions">
-    <form method="post" action="/proposals/{{ p.id }}/approve"><button type="submit">✓ Approve</button></form>
-    <form method="post" action="/proposals/{{ p.id }}/reject"><button class="danger" type="submit">✗ Reject</button></form>
+    <form method="post" action="{{ base }}/proposals/{{ p.id }}/approve"><button type="submit">✓ Approve</button></form>
+    <form method="post" action="{{ base }}/proposals/{{ p.id }}/reject"><button class="danger" type="submit">✗ Reject</button></form>
   </div>
   {% endif %}
 </div>

@@ -3,19 +3,27 @@
 {% block content %}
 <div class="toolbar">
   <h1>Sources</h1>
-  {% if user.role == 'admin' %}
+  {% if can_admin %}
   <div class="filters">
-    <form method="post" action="/scan-now"><button type="submit" title="LLM scan of every enabled source">📡 Scan now</button></form>
-    <form method="post" action="/check-links-now"><button type="submit" title="Check every grant link">🔗 Check links</button></form>
+    <form method="post" action="{{ base }}/scan-now"><button type="submit" title="LLM scan of every enabled source">📡 Scan now</button></form>
+    <form method="post" action="{{ base }}/check-links-now"><button type="submit" title="Check every grant link">🔗 Check links</button></form>
   </div>
   {% endif %}
 </div>
 
+{% set notice = request.query_params.get('notice') %}
+{% if notice == 'nokey' or (can_admin and not has_key) %}
+<div class="card highlight small">Scans in {{ ws.name }} run on the Anthropic key of its paying admin, and there is none saved: nothing will be scanned until there is. See <a href="{{ base }}/settings">settings</a>.</div>
+{% elif notice == 'imported' %}
+<div class="card highlight small">Import done: {{ request.query_params.get('added') }} added, {{ request.query_params.get('updated') }} updated.</div>
+{% elif notice == 'import_failed' %}
+<div class="error">That file was not imported ({{ request.query_params.get('why') }}): it has to be a file exported from a Grant Radar sources page.</div>
+{% endif %}
 <div class="table-wrap">
 {% if scan_running %}<p class="small muted">A scan is running: sources appear in the log below as they finish, and a second scan will not start until this one is done.</p>{% endif %}
 <table class="sources stack">
-  <colgroup><col class="c-sname"><col class="c-surl"><col class="c-hints"><col class="c-when"><col class="c-flag">{% if user.role == 'admin' %}<col class="c-sactions">{% endif %}</colgroup>
-  <thead><tr><th>Name</th><th>URL</th><th>Hints</th><th>Last scan</th><th class="center">Enabled</th>{% if user.role == 'admin' %}<th></th>{% endif %}</tr></thead>
+  <colgroup><col class="c-sname"><col class="c-surl"><col class="c-hints"><col class="c-when"><col class="c-flag">{% if can_admin %}<col class="c-sactions">{% endif %}</colgroup>
+  <thead><tr><th>Name</th><th>URL</th><th>Hints</th><th>Last scan</th><th class="center">Enabled</th>{% if can_admin %}<th></th>{% endif %}</tr></thead>
   <tbody>
     {% for s in sources %}
     <tr class="{% if not s.enabled %}row-disabled{% endif %}">
@@ -24,12 +32,12 @@
       <td data-label="Hints" class="small"><div class="clamp3" title="{{ s.hints or '' }}">{{ s.hints or '—' }}</div></td>
       <td data-label="Last scan" class="small nowrap-wide">{{ s.last_scanned_at or 'never' }}</td>
       <td data-label="Enabled" class="center">{{ '✓' if s.enabled else '—' }}</td>
-      {% if user.role == 'admin' %}
+      {% if can_admin %}
       <td class="actions-inline">
-        <a class="btn small muted" href="/sources/{{ s.id }}/edit">edit</a>
-        <form method="post" action="/scan-now"><input type="hidden" name="source_id" value="{{ s.id }}"><button class="small" type="submit">scan</button></form>
-        <form method="post" action="/sources/{{ s.id }}/toggle"><button class="small" type="submit">{{ 'off' if s.enabled else 'on' }}</button></form>
-        <form method="post" action="/sources/{{ s.id }}/delete" onsubmit="return confirm('Delete this source?')"><button class="small danger" type="submit">del</button></form>
+        <a class="btn small muted" href="{{ base }}/sources/{{ s.id }}/edit">edit</a>
+        <form method="post" action="{{ base }}/scan-now"><input type="hidden" name="source_id" value="{{ s.id }}"><button class="small" type="submit">scan</button></form>
+        <form method="post" action="{{ base }}/sources/{{ s.id }}/toggle"><button class="small" type="submit">{{ 'off' if s.enabled else 'on' }}</button></form>
+        <form method="post" action="{{ base }}/sources/{{ s.id }}/delete" onsubmit="return confirm('Delete this source?')"><button class="small danger" type="submit">del</button></form>
       </td>
       {% endif %}
     </tr>
@@ -40,10 +48,10 @@
 </table>
 </div>
 
-{% if user.role == 'admin' %}
+{% if can_admin %}
 <div class="card">
   <h2>New source</h2>
-  <form method="post" action="/sources/new" class="grid2">
+  <form method="post" action="{{ base }}/sources/new" class="grid2">
     <label>Name * <input name="name" required placeholder="SNF"></label>
     <label>URL <input name="url" placeholder="https://www.snf.ch/en/funding"></label>
     <label class="span2">Hints <input name="hints" placeholder="calls relevant for bioethics / digital health / AI ethics; ignore artist residencies"></label>
@@ -51,6 +59,20 @@
   </form>
 </div>
 {% endif %}
+
+<div class="card">
+  <h2>Move sources between workspaces</h2>
+  <p class="small muted">The export is a JSON file with every source of this workspace: name, URL, hints, enabled or not. Importing it elsewhere adds the sources it names and updates the ones already there by name, so the same file can be imported twice.</p>
+  <div class="actions">
+    <a class="btn muted" href="{{ base }}/sources/export.json">⬇ Export sources (JSON)</a>
+    {% if can_admin %}
+    <form method="post" action="{{ base }}/sources/import" enctype="multipart/form-data" class="inline-form">
+      <input type="file" name="file" accept="application/json,.json" required>
+      <button type="submit">Import</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
 
 <h2>Scan log</h2>
 <div class="table-wrap">

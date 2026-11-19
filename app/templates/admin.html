@@ -1,25 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Admin</h1>
+<h1>Platform admin</h1>
+<p class="small muted">Accounts and shared workspaces. What is inside a workspace — its grants, sources, members — is managed from that workspace's own settings, by its admins.</p>
 
-{% if new_key %}
-<div class="card highlight">
-  <strong>New API key (shown only once — save it now):</strong>
-  <code class="key">{{ new_key }}</code>
-  <p class="small muted">Header: <code>X-API-Key: {{ new_key }}</code> — MCP capability URL: <code>/mcp/k/{{ new_key }}</code></p>
+<div class="card">
+  <h2>Workspaces</h2>
+  <div class="table-wrap">
+  <table class="stack">
+    <thead><tr><th>Name</th><th>Kind</th><th>Members</th><th>Grants</th><th>Pays the scans</th><th>Monthly scan</th></tr></thead>
+    <tbody>
+      {% for w in spaces %}
+      <tr>
+        <td class="cell-name"><strong>{{ w.name }}</strong> <span class="muted small">/w/{{ w.slug }}</span></td>
+        <td data-label="Kind">{{ w.kind }}</td>
+        <td data-label="Members">{{ w.n_members }}</td>
+        <td data-label="Grants">{{ w.n_grants }}</td>
+        <td data-label="Pays">{{ w.payer_name or '—' }}</td>
+        <td data-label="Monthly scan">{{ 'on' if w.auto_scan else 'off' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <h3>New shared workspace</h3>
+  <form method="post" action="/admin/workspaces/new" class="inline-form">
+    <input name="name" placeholder="name (e.g. DEH Lab)" required>
+    <select name="admin_user_id" aria-label="First admin" required>
+      {% for u in users if u.active %}<option value="{{ u.id }}" {% if u.username == user.username %}selected{% endif %}>admin: {{ u.username }}</option>{% endfor %}
+    </select>
+    <button type="submit">Create</button>
+  </form>
+  <p class="small muted">The first admin also pays for the workspace's scans, with their own Anthropic key, until the workspace's settings name another admin. A personal workspace needs no creating: everyone gets one the first time they sign in.</p>
 </div>
-{% endif %}
 
 <div class="card">
   <h2>Users</h2>
   <div class="table-wrap">
   <table class="stack">
-    <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Active</th><th>Password</th><th></th></tr></thead>
+    <thead><tr><th>Username</th><th>Email</th><th>Platform role</th><th>Active</th><th>Anthropic key</th><th>Password</th><th></th></tr></thead>
     <tbody>
       {% for u in users %}
       <tr>
         <td class="cell-name"><strong>{{ u.username }}</strong></td><td data-label="Email" class="break">{{ u.email }}</td><td data-label="Role">{{ u.role }}</td>
         <td data-label="Active">{{ '✓' if u.active else '—' }}</td>
+        <td data-label="Key">{{ 'saved' if u.has_key else '—' }}</td>
         <td data-label="Password">
           <form method="post" action="/admin/users/{{ u.id }}/password" class="inline-form"
                 onsubmit="return confirm('Set a new password for {{ u.username }}?')">
@@ -41,31 +65,6 @@
     <select name="role"><option value="reader">reader</option><option value="admin">admin</option></select>
     <button type="submit">Create</button>
   </form>
-</div>
-
-<div class="card">
-  <h2>API keys (REST + MCP)</h2>
-  <div class="table-wrap">
-  <table class="stack">
-    <thead><tr><th>Label</th><th>Key</th><th>Created</th><th>Last used</th><th>Active</th><th></th></tr></thead>
-    <tbody>
-      {% for k in api_keys %}
-      <tr>
-        <td class="cell-name"><strong>{{ k.label }}</strong></td>
-        <td data-label="Key"><code>{{ k.key[:6] }}…{{ k.key[-4:] }}</code></td>
-        <td data-label="Created" class="small">{{ k.created_at }}</td>
-        <td data-label="Last used" class="small">{{ k.last_used_at or 'never' }}</td>
-        <td data-label="Active">{{ '✓' if k.active else '—' }}</td>
-        <td>{% if k.active %}<form method="post" action="/admin/keys/{{ k.id }}/revoke" onsubmit="return confirm('Revoke this key?')"><button class="small danger" type="submit">revoke</button></form>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  <h3>New key</h3>
-  <form method="post" action="/admin/keys/new" class="inline-form">
-    <input name="label" placeholder="label (e.g. ono-desktop)" required>
-    <button type="submit">Generate</button>
-  </form>
+  <p class="small muted">The platform role is not a workspace role: <code>admin</code> here means this page. API keys are each user's own, under their name in the header.</p>
 </div>
 {% endblock %}

@@ -17,6 +17,7 @@
       <tr><th>Recurrence</th><td>{{ g.deadline_logic or '—' }}{% if g.recurring == 'yes' %} <span class="chip">recurring</span>{% elif g.recurring == 'no' %} <span class="chip conf-low" title="Closed automatically a week after its deadline">one-off</span>{% endif %}</td></tr>
       <tr><th>Grant start</th><td>{{ g.grant_start or '—' }}</td></tr>
       <tr><th>Type</th><td>{{ g.primary_type or '—' }}</td></tr>
+      <tr><th>Fit</th><td>{% if g.fit %}<span class="chip conf-{{ g.fit }}">{{ g.fit }}</span>{% else %}<span class="muted">not rated</span>{% endif %}</td></tr>
       <tr><th>Status</th><td>{{ g.status }}{% if g.status == 'open' and g.deadline_date and g.deadline_date < today %} <span class="chip conf-low">expired</span>{% endif %}</td></tr>
       <tr><th>Link</th><td class="break">{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">{{ g.link }}</a>{% if g.link_status == 'dead' %} 💀{% endif %}{% else %}—{% endif %}</td></tr>
       <tr><th>Notes</th><td>{{ g.notes or '—' }}</td></tr>
@@ -25,11 +26,19 @@
       <tr><th>LLM check</th><td class="small">{{ g.last_verified_at or 'never' }}</td></tr>
       <tr><th>Record</th><td class="small muted">created {{ g.created_at }} · updated {{ g.updated_at }}</td></tr>
     </table>
-    {% if user.role == 'admin' %}
     <div class="actions">
-      <a class="btn" href="/grants/{{ g.id }}/edit">Edit</a>
-      <form method="post" action="/grants/{{ g.id }}/check"><button type="submit" title="Fetch the page, compare with the record, file a diff proposal if needed">Check now</button></form>
+      {% if can_write %}
+      <a class="btn" href="{{ base }}/grants/{{ g.id }}/edit">Edit</a>
+      <form method="post" action="{{ base }}/grants/{{ g.id }}/check"><button type="submit" title="Fetch the page, compare with the record, file a diff proposal if needed">Check now</button></form>
+      {% endif %}
+      {% if copy_targets %}
+      <form method="post" action="{{ base }}/grants/{{ g.id }}/copy" class="inline-form">
+        <select name="target" aria-label="Copy to workspace">
+          {% for w in copy_targets %}<option value="{{ w.slug }}">{{ w.name }}</option>{% endfor %}
+        </select>
+        <button class="btn muted" type="submit" title="Makes an independent copy in the other workspace">Copy there</button>
+      </form>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
 </div>

@@ -22,9 +22,10 @@ def compute_diff(proposal: dict) -> list[dict]:
     return diff
 
 
-def approve(proposal_id: int) -> bool:
+def approve(proposal_id: int, workspace_id: int) -> bool:
     with get_db() as db:
-        p = db.execute("SELECT * FROM proposals WHERE id=? AND status='pending'", (proposal_id,)).fetchone()
+        p = db.execute("SELECT * FROM proposals WHERE id=? AND status='pending' AND workspace_id=?",
+                       (proposal_id, workspace_id)).fetchone()
         if not p:
             return False
         payload = json.loads(p["payload"] or "{}")
@@ -33,8 +34,8 @@ def approve(proposal_id: int) -> bool:
         if p["kind"] == "new":
             if not fields.get("name"):
                 return False
-            cols = list(fields.keys()) + ["origin", "source_id"]
-            vals = list(fields.values()) + ["discovery", p["source_id"]]
+            cols = list(fields.keys()) + ["origin", "source_id", "workspace_id"]
+            vals = list(fields.values()) + ["discovery", p["source_id"], workspace_id]
             db.execute(
                 f"INSERT INTO grants ({', '.join(cols)}) VALUES ({', '.join('?' * len(vals))})",
                 vals,
@@ -42,8 +43,8 @@ def approve(proposal_id: int) -> bool:
         elif p["kind"] == "update" and p["grant_id"] and fields:
             sets = ", ".join(f"{k}=?" for k in fields)
             db.execute(
-                f"UPDATE grants SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                list(fields.values()) + [p["grant_id"]],
+                f"UPDATE grants SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE id=? AND workspace_id=?",
+                list(fields.values()) + [p["grant_id"], workspace_id],
             )
             # Se il grant non è ancora mappato a una source e la proposal sì, eredita.
             if p["source_id"]:
@@ -60,11 +61,11 @@ def approve(proposal_id: int) -> bool:
     return True
 
 
-def reject(proposal_id: int) -> bool:
+def reject(proposal_id: int, workspace_id: int) -> bool:
     with get_db() as db:
         cur = db.execute(
             "UPDATE proposals SET status='rejected', decided_at=CURRENT_TIMESTAMP "
-            "WHERE id=? AND status='pending'",
-            (proposal_id,),
+            "WHERE id=? AND status='pending' AND workspace_id=?",
+            (proposal_id, workspace_id),
         )
         return cur.rowcount > 0

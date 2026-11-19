@@ -25,11 +25,20 @@
   <span class="tagline-top">a funding table that watches the horizon by itself</span>
   <nav>
     {% if user %}
-      <a href="/app">grants</a>
-      <a href="/proposals">proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
-      <a href="/sources">sources</a>
+      {% if ws %}
+      {% if workspaces|length > 1 %}
+      <select class="ws-switch" aria-label="Workspace" onchange="location.href='/w/' + this.value + '/app'">
+        {% for w in workspaces %}<option value="{{ w.slug }}" {% if w.id == ws.id %}selected{% endif %}>{{ w.name }}{% if w.kind == 'personal' %} (personal){% endif %}</option>{% endfor %}
+      </select>
+      {% else %}<span class="ws-name">{{ ws.name }}</span>{% endif %}
+      <a href="{{ base }}/app">grants</a>
+      <a href="{{ base }}/proposals">proposals{% if pending_count %} <span class="badge">{{ pending_count }}</span>{% endif %}</a>
+      <a href="{{ base }}/sources">sources</a>
+      <a href="{{ base }}/settings">settings</a>
+      {% endif %}
       {% if user.role == 'admin' %}<a href="/admin">admin</a>{% endif %}
-      <a href="/logout">logout ({{ user.username }})</a>
+      <a href="/me">{{ user.username }}</a>
+      <a href="/logout">logout</a>
     {% else %}
       {# `/app` e non `/login`: sulla landing pubblica l'identita' non arriva,
          quindi questo ramo e' l'unico che si vede li' — e deve portare a un
@@ -43,9 +52,12 @@
 {% if scan_failures %}
 <div class="card scan-alert" role="alert">
   <strong>The last scan failed for {{ scan_failures|length }} source{{ 's' if scan_failures|length != 1 }}</strong>
-  ({{ scan_failures[0].started_at }}): deadlines and closures are not being refreshed.
-  {% if 'API key' in (scan_failures[0].detail or '') or '401' in (scan_failures[0].detail or '') %}The Anthropic API key was rejected — replace <code>ANTHROPIC_API_KEY</code> in the server's <code>.env</code> and restart.{% endif %}
-  See the scan log on <a href="/sources">sources</a>.
+  ({{ scan_failures[0].started_at }}) in {{ ws.name }}: deadlines and closures are not being refreshed.
+  {% set d = scan_failures[0].detail or '' %}
+  {% if 'no_api_key' in d %}Scans here run on the Anthropic key of <strong>{{ payer_name or 'the paying admin' }}</strong>, who has not saved one yet (it is set under their own name, top right).
+  {% elif 'API key' in d or '401' in d %}The Anthropic key of <strong>{{ payer_name or 'the paying admin' }}</strong> was rejected: it has to be replaced under their own name, top right.
+  {% elif 'credit balance' in d %}The Anthropic account of <strong>{{ payer_name or 'the paying admin' }}</strong> is out of credit.{% endif %}
+  See the scan log on <a href="{{ base }}/sources">sources</a>.
 </div>
 {% endif %}
 {% block content %}{% endblock %}

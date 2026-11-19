@@ -6,14 +6,38 @@ Grant Radar is a funding-opportunity tracker for a research group: a table of ca
 
 ## 1. Getting in
 
-`grantradar.borant.eu/` is a public showcase and never asks who is reading it, so it shows no counts and no grants. The table lives at `/app`, behind the login.
+`grantradar.borant.eu/` is a public showcase and never asks who is reading it, so it shows no counts and no grants. The tables live behind the login: `/app` takes you to the workspace you were last in.
 
 There is **no self-registration** — the app has no sign-up form at all, because a funding table for one institute has no reason to accept strangers. Ask Spit for access: either an account is created for you in the admin panel, or your existing Borant ID gets you in with the single login you already use for the other borant tools. One click on *Open the table* covers both cases.
 
-Two **roles**, and the difference is what each can spend:
+### Workspaces
 
-| | reader | admin |
-|---|---|---|
+Everything in Grant Radar lives in a **workspace**: its grants, its sources, its proposal queue and its settings. Nothing is shared between two — the same call tracked by two workspaces is two rows, each checked and refreshed on its own. You move between the ones you belong to with the selector in the header, and every address carries the workspace's name: `/w/ibme/app`.
+
+There are two kinds. A **personal** workspace is created for you the first time you sign in; it is yours alone and takes no other members. A **shared** workspace is created by a platform administrator, who names its first admin; from then on its admins manage it.
+
+Three **roles**, held per workspace:
+
+| | read | write | admin |
+|---|---|---|---|
+| Read the table, filter it, export it | yes | yes | yes |
+| Read the proposals queue, the sources, the settings | yes | yes | yes |
+| Add, edit or delete a grant; run a check on one | no | yes | yes |
+| Approve or reject a proposal | no | yes | yes |
+| Add sources, run a scan, check links, import sources | no | no | yes |
+| Change the research interests, the members, who pays | no | no | yes |
+
+Not being a member is not a fourth role: a workspace you do not belong to answers "not found", exactly like one that does not exist. A grant can be **copied** into another workspace you can write to, from its detail card; the copy is independent from then on.
+
+### Research interests and fit
+
+Each workspace describes itself in its **settings**: who the group is, where it is based, what it works on. The scan reads that text and nothing else to decide what is relevant, and rates every call **high**, **medium** or **low** fit against it. Fit is not the same as a proposal's *confidence*: confidence says how well the facts were verified, fit says how much the call concerns you. A well-documented call that barely touches your work is high confidence and low fit. The table can be filtered by fit.
+
+### Who pays for the scans
+
+Scans and checks call a language model, and the bill goes to a person: each workspace names one of its admins as the one who pays, and the scan runs on **that person's own Anthropic API key**. You save yours under your name in the header; it is stored encrypted, shown afterwards only as its last four characters, and sent to nobody but Anthropic. A workspace whose paying admin has no key is simply not scanned, and its pages say so.
+
+---|---|---|
 | Read the table, filter it, export it | yes | yes |
 | Read the proposals queue and the sources | yes | yes |
 | Add, edit or delete a grant | no | yes |
@@ -48,6 +72,8 @@ Manual edits leave no history — only the record's created and updated timestam
 *Delete grant* is permanent and takes the grant's proposals with it, so the audit trail for that scheme disappears too. Prefer `archived` for a scheme that is over: it keeps the row and takes it out of the nightly link checks.
 
 ## 4. Sources
+
+Sources belong to a workspace. To start a new workspace from an existing list, export the sources of one as a JSON file from its sources page and import the file in the other: sources are matched by name, so importing the same file twice updates and adds nothing.
 
 A **source** is a place the radar is told to look: a name, a funding page URL, and a line of **hints** in free text describing what matters and what to ignore. The hints go into the scanner's prompt verbatim, so this is the one knob that tunes what comes back — "calls relevant for bioethics / digital health / AI ethics; ignore artist residencies" does more work than a longer source list.
 
@@ -95,13 +121,13 @@ It also does not track your applications. There is no notion of who is applying,
 
 If you work with an AI assistant, Grant Radar plugs into it, and this is the surface where the tool earns its keep — "what closes in the next two months that a postdoc could apply to" is a question you ask in a sentence and answer badly with filters.
 
-**Getting a key.** Ask an admin to generate one in the admin panel; it is shown once. Paste the endpoint `https://grantradar.borant.eu/mcp` and the key into your client's MCP settings as an `X-API-Key` header. Clients that cannot set headers can use `https://grantradar.borant.eu/mcp/k/<your-key>/` instead — the key sits in the URL there, where access logs may keep it, so take one key per client and revoke rather than share.
+**Getting a key.** Generate one yourself, under your name in the header; it is shown once. Paste the endpoint `https://grantradar.borant.eu/mcp` and the key into your client's MCP settings as an `X-API-Key` header. Clients that cannot set headers can use `https://grantradar.borant.eu/mcp/k/<your-key>/` instead — the key sits in the URL there, where access logs may keep it, so take one key per client and revoke rather than share.
 
-**What the assistant can do.** Search the tracked grants with the same filters as the table (including the deadline-aware `open` and `expired`), read one grant in full, list the deadlines falling inside a window of days you choose, read the pending queue, list the configured sources, and file a proposal — a new grant or an update to one — which lands in the same queue as everything else, tagged `ono_mcp`, waiting for the same human click.
+**What the assistant can do.** List your workspaces, search a workspace's grants with the same filters as the table (including the deadline-aware `open` and `expired`, and the fit), read one grant in full, list the deadlines falling inside a window of days you choose, read the pending queue, list the configured sources, and file a proposal — a new grant or an update to one — which lands in the same queue as everything else, tagged `ono_mcp`, waiting for the same human click.
 
 **What it cannot do.** Approve or reject anything: approval exists only as a button in the web UI, on every surface, by design. It also cannot edit the table directly, add or change a source, or start a scan.
 
-**What it reaches.** A key is access, not an identity — it is not tied to your account, and it opens everything the table holds to whichever model that client talks to. Treat handing one out as the same decision as sending the table itself.
+**What it reaches.** A key speaks for you: it reaches the workspaces you are a member of, with your role in each, and nothing else. The assistant starts with `list_workspaces` and names the one it means on every call; left unnamed, it is your personal one. Handing a key to a client is handing it everything you can read.
 
 For scripts rather than chats, `GET /ono/grants` with the same key returns a compact JSON dump of the table.
 

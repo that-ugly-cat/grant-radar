@@ -39,13 +39,19 @@
         <option value="no" {% if grant.recurring == 'no' %}selected{% endif %}>no — one-off or final call</option>
       </select>
     </label>
+    <label title="How well the call matches this workspace's research interests (see settings)">Fit
+      <select name="fit">
+        <option value="" {% if not grant.fit %}selected{% endif %}>not rated</option>
+        {% for f in ['high','medium','low'] %}<option value="{{ f }}" {% if grant.fit == f %}selected{% endif %}>{{ f }}</option>{% endfor %}
+      </select>
+    </label>
     <div class="span2 actions">
       <button type="submit">Save</button>
-      <a class="btn muted" href="/app">Cancel</a>
+      <a class="btn muted" href="{{ base }}/app">Cancel</a>
     </div>
   </form>
   {% if grant.id %}
-  <form method="post" action="/grants/{{ grant.id }}/delete" onsubmit="return confirm('Permanently delete this grant and its proposals?')">
+  <form method="post" action="{{ base }}/grants/{{ grant.id }}/delete" onsubmit="return confirm('Permanently delete this grant and its proposals?')">
     <button class="danger" type="submit">Delete grant</button>
   </form>
   {% endif %}

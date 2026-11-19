@@ -1,25 +1,25 @@
 <p class="table-meta small">
   <span class="muted">{{ grants|length }} grant{{ '' if grants|length == 1 else 's' }}</span>
-  <a href="/grants/export.xlsx?q={{ q|urlencode }}&funder={{ f_funder|urlencode }}&primary_type={{ f_type|urlencode }}&source={{ f_source|urlencode }}&status={{ f_status|urlencode }}">⬇ Export to Excel (current filter)</a>
+  <a href="{{ base }}/grants/export.xlsx?fit={{ f_fit|urlencode }}&q={{ q|urlencode }}&funder={{ f_funder|urlencode }}&primary_type={{ f_type|urlencode }}&source={{ f_source|urlencode }}&status={{ f_status|urlencode }}">⬇ Export to Excel (current filter)</a>
 </p>
 <div class="table-wrap">
 <table class="grants stack">
   <colgroup>
     <col class="c-name"><col class="c-funder"><col class="c-scope"><col class="c-max"><col class="c-deadline">
-    <col class="c-type"><col class="c-link">{% if user.role == 'admin' %}<col class="c-actions">{% endif %}
+    <col class="c-type"><col class="c-link">{% if can_write %}<col class="c-actions">{% endif %}
   </colgroup>
   <thead>
     <tr>
       <th>Grant</th><th>Funder</th><th>Scope</th><th>Max</th><th>Deadline</th>
-      <th>Type</th><th class="center">Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
+      <th>Type</th><th class="center">Link</th>{% if can_write %}<th></th>{% endif %}
     </tr>
   </thead>
   <tbody>
     {% for g in grants %}
     <tr class="row-click {% if g.link_status == 'dead' %}row-dead{% endif %} {% if g.status != 'open' %}row-closed{% endif %}"
-        hx-get="/grants/{{ g.id }}/detail" hx-target="#modal"
+        hx-get="{{ base }}/grants/{{ g.id }}/detail" hx-target="#modal"
         hx-trigger="click[!event.target.closest('a') && !event.target.closest('button')]">
-      <td class="cell-name"><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Entered through the proposals queue (not typed into the form). What filed the proposal is on the proposals page.">📡</span>{% endif %}{% if g.status != 'open' %} <span class="chip">{{ g.status }}</span>{% endif %}
+      <td class="cell-name"><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Entered through the proposals queue (not typed into the form). What filed the proposal is on the proposals page.">📡</span>{% endif %}{% if g.status != 'open' %} <span class="chip">{{ g.status }}</span>{% endif %}{% if g.fit %} <span class="chip conf-{{ g.fit }}" title="Fit with this workspace's research interests">{{ g.fit }} fit</span>{% endif %}
         {% if g.notes %}<div class="muted small clamp2">{{ g.notes }}</div>{% endif %}</td>
       <td data-label="Funder">{{ g.funder or '—' }}</td>
       <td data-label="Scope" class="small m-hide"><div class="clamp3">{{ g.scope or '—' }}</div></td>
@@ -31,9 +31,9 @@
       </div></td>
       <td data-label="Type">{{ g.primary_type or '—' }}</td>
       <td data-label="Link" class="center">{% if g.link %}<a class="ext" href="{{ g.link }}" target="_blank" rel="noopener" title="Open the call's page" aria-label="Open the call's page">↗{% if g.link_status == 'dead' %}💀{% endif %}</a>{% else %}—{% endif %}</td>
-      {% if user.role == 'admin' %}<td class="actions-inline">
-        <a class="btn small muted" href="/grants/{{ g.id }}/edit">edit</a>
-        <form method="post" action="/grants/{{ g.id }}/check"><button class="small" type="submit" title="LLM check: fetch the page, compare, file a diff proposal if needed">check</button></form>
+      {% if can_write %}<td class="actions-inline">
+        <a class="btn small muted" href="{{ base }}/grants/{{ g.id }}/edit">edit</a>
+        <form method="post" action="{{ base }}/grants/{{ g.id }}/check"><button class="small" type="submit" title="LLM check: fetch the page, compare, file a diff proposal if needed">check</button></form>
       </td>{% endif %}
     </tr>
     {% else %}

@@ -78,6 +78,26 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used_at DATETIME
 );
 
+CREATE TABLE IF NOT EXISTS workspaces (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug          TEXT UNIQUE NOT NULL,
+    name          TEXT NOT NULL,
+    kind          TEXT NOT NULL DEFAULT 'shared',   -- personal | shared
+    owner_user_id INTEGER REFERENCES users(id),     -- personal: whose it is
+    payer_user_id INTEGER REFERENCES users(id),     -- whose Anthropic key pays the scans
+    profile       TEXT,                             -- research interests, read by the scan prompt
+    auto_scan     INTEGER NOT NULL DEFAULT 1,       -- take part in the monthly scan
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS memberships (
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    role         TEXT NOT NULL DEFAULT 'read',      -- read | write | admin
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, workspace_id)
+);
+
 CREATE TABLE IF NOT EXISTS scan_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id   INTEGER REFERENCES sources(id),
@@ -99,7 +119,18 @@ GRANT_FIELDS = [
 # edit form handles them on their own, with a closed set of values.
 STATUS_VALUES = ("open", "closed", "archived")
 RECURRING_VALUES = ("yes", "no")
-PROPOSAL_FIELDS = GRANT_FIELDS + ["status", "recurring"]
+# How well a call matches the research interests the workspace declares. It is
+# a different question from a proposal's `confidence`, which says how well the
+# facts were verified: until November 2026 one field carried both, and "low"
+# meant "I am not sure of the date" as often as "this is off-topic".
+FIT_VALUES = ("high", "medium", "low")
+PROPOSAL_FIELDS = GRANT_FIELDS + ["status", "recurring", "fit"]
+
+# What a workspace starts with when nobody has written its interests yet.
+DEFAULT_PROFILE = (
+    "An academic institute of biomedical ethics based in Zurich, Switzerland. Research areas: "
+    "bioethics, digital health, AI ethics, public health, empirical ethics."
+)
 
 # A one-off call stays visible as `expired` for this long after its deadline
 # before the nightly job closes it: deadlines do get extended.
@@ -122,6 +153,10 @@ def clean_proposal_fields(fields: dict | None) -> dict:
             v = str(v).strip().lower()
             v = {"true": "yes", "false": "no", "1": "yes", "0": "no"}.get(v, v)
             if v not in RECURRING_VALUES:
+                continue
+        if k == "fit":
+            v = str(v).strip().lower()
+            if v not in FIT_VALUES:
                 continue
         out[k] = v
     return out
@@ -157,7 +192,23 @@ def init_db() -> None:
             db.execute("ALTER TABLE grants ADD COLUMN link_fail_count INTEGER DEFAULT 0")
         if "link_last_ok_at" not in cols:
             db.execute("ALTER TABLE grants ADD COLUMN link_last_ok_at DATETIME")
+        # Migration 2026-11-20: workspaces. Every grant, source and proposal
+        # belongs to exactly one; nothing is shared between two.
+        if "workspace_id" not in cols:
+            db.execute("ALTER TABLE grants ADD COLUMN workspace_id INTEGER REFERENCES workspaces(id)")
+        if "fit" not in cols:
+            db.execute("ALTER TABLE grants ADD COLUMN fit TEXT")
+        if "workspace_id" not in pcols:
+            db.execute("ALTER TABLE proposals ADD COLUMN workspace_id INTEGER REFERENCES workspaces(id)")
+        scols = [r["name"] for r in db.execute("PRAGMA table_info(sources)")]
+        if "workspace_id" not in scols:
+            db.execute("ALTER TABLE sources ADD COLUMN workspace_id INTEGER REFERENCES workspaces(id)")
+        kcols = [r["name"] for r in db.execute("PRAGMA table_info(api_keys)")]
+        if "user_id" not in kcols:
+            db.execute("ALTER TABLE api_keys ADD COLUMN user_id INTEGER REFERENCES users(id)")
         ucols = [r["name"] for r in db.execute("PRAGMA table_info(users)")]
+        if "anthropic_key_enc" not in ucols:
+            db.execute("ALTER TABLE users ADD COLUMN anthropic_key_enc TEXT")
         if "borant_sub" not in ucols:
             db.execute("ALTER TABLE users ADD COLUMN borant_sub TEXT")
         db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_borant_sub "
@@ -191,13 +242,14 @@ def status_condition(status: str, prefix: str = "") -> tuple[str, list]:
     return "", []
 
 
-def grants_digest() -> list[dict]:
-    """Compact dump of current grants, used by the scanner prompt and /ono/grants."""
+def grants_digest(workspace_id: int) -> list[dict]:
+    """Compact dump of one workspace's grants, used by the scanner prompt and /ono/grants."""
     with get_db() as db:
         rows = db.execute(
             "SELECT id, name, funder, scope, max_amount, duration_months, deadline, "
-            "deadline_date, deadline_logic, recurring, link, primary_type, source_id, status "
-            "FROM grants ORDER BY deadline_date IS NULL, deadline_date"
+            "deadline_date, deadline_logic, recurring, fit, link, primary_type, source_id, status "
+            "FROM grants WHERE workspace_id=? ORDER BY deadline_date IS NULL, deadline_date",
+            (workspace_id,),
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -213,7 +265,7 @@ def auto_close_expired() -> int:
     """
     with get_db() as db:
         rows = db.execute(
-            "SELECT id, source_id, deadline_date FROM grants "
+            "SELECT id, source_id, workspace_id, deadline_date FROM grants "
             "WHERE status='open' AND recurring='no' AND deadline_date IS NOT NULL "
             "AND date(deadline_date) < date('now', ?)",
             (f"-{AUTO_CLOSE_GRACE_DAYS} days",),
@@ -222,10 +274,10 @@ def auto_close_expired() -> int:
             db.execute("UPDATE grants SET status='closed', updated_at=CURRENT_TIMESTAMP WHERE id=?",
                        (r["id"],))
             db.execute(
-                "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, "
-                "confidence, method, status, decided_at) "
-                "VALUES ('update', ?, ?, ?, ?, '', 'high', 'auto_close', 'approved', CURRENT_TIMESTAMP)",
-                (r["id"], r["source_id"], '{"status": "closed"}',
+                "INSERT INTO proposals (kind, grant_id, source_id, workspace_id, payload, rationale, "
+                "source_url, confidence, method, status, decided_at) "
+                "VALUES ('update', ?, ?, ?, ?, ?, '', 'high', 'auto_close', 'approved', CURRENT_TIMESTAMP)",
+                (r["id"], r["source_id"], r["workspace_id"], '{"status": "closed"}',
                  f"Closed automatically: not recurring, and the deadline ({r['deadline_date']}) "
                  f"passed more than {AUTO_CLOSE_GRACE_DAYS} days ago."),
             )
@@ -234,13 +286,14 @@ def auto_close_expired() -> int:
     return len(rows)
 
 
-def failed_scan_sources() -> list[dict]:
-    """Enabled sources whose most recent finished scan was an error."""
+def failed_scan_sources(workspace_id: int) -> list[dict]:
+    """A workspace's enabled sources whose most recent finished scan was an error."""
     with get_db() as db:
         rows = db.execute(
             "SELECT s.id, s.name, l.started_at, l.detail FROM sources s "
             "JOIN scan_log l ON l.id = (SELECT MAX(id) FROM scan_log "
             "                           WHERE source_id = s.id AND outcome IS NOT NULL) "
-            "WHERE s.enabled=1 AND l.outcome='error' ORDER BY s.name"
+            "WHERE s.enabled=1 AND s.workspace_id=? AND l.outcome='error' ORDER BY s.name",
+            (workspace_id,),
         ).fetchall()
     return [dict(r) for r in rows]
