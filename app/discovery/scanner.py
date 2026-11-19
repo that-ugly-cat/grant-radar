@@ -19,13 +19,18 @@ MAX_WEB_SEARCHES = 12
 # Strict schemas cap the number of union-typed parameters at 16: twelve
 # descriptive fields plus these two leave room for two more, not for a dozen.
 _FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS}
+# No `enum` on these two: the API refuses an enum on a nullable string
+# ("Enum value 'open' does not match declared type"). The vocabulary is held by
+# the description, the prompt and clean_proposal_fields, which drops the rest.
 _FIELD_PROPS["status"] = {
-    "type": ["string", "null"], "enum": ["open", "closed", None],
-    "description": "closed = the scheme ended or this was its last call; open = a closed row has a new call",
+    "type": ["string", "null"],
+    "description": "Exactly 'open' or 'closed', or null. closed = the scheme ended or this was "
+                   "its last call; open = a closed row has a new call",
 }
 _FIELD_PROPS["recurring"] = {
-    "type": ["string", "null"], "enum": ["yes", "no", None],
-    "description": "yes = further editions are expected; no = one-off or final call",
+    "type": ["string", "null"],
+    "description": "Exactly 'yes' or 'no', or null. yes = further editions are expected; "
+                   "no = one-off or final call",
 }
 
 SUBMIT_TOOL = {
