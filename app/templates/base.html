@@ -40,6 +40,14 @@
   </nav>
 </header>
 <main>
+{% if scan_failures %}
+<div class="card scan-alert" role="alert">
+  <strong>The last scan failed for {{ scan_failures|length }} source{{ 's' if scan_failures|length != 1 }}</strong>
+  ({{ scan_failures[0].started_at }}): deadlines and closures are not being refreshed.
+  {% if 'API key' in (scan_failures[0].detail or '') or '401' in (scan_failures[0].detail or '') %}The Anthropic API key was rejected — replace <code>ANTHROPIC_API_KEY</code> in the server's <code>.env</code> and restart.{% endif %}
+  See the scan log on <a href="/sources">sources</a>.
+</div>
+{% endif %}
 {% block content %}{% endblock %}
 </main>
 <div id="modal"></div>

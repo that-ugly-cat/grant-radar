@@ -9,8 +9,10 @@ touching your data.
 
 - **Grants table** — FastAPI + SQLite + HTMX. Filters, deadline sort, manual edit.
 - **Discovery, two engines, both in-app:**
-  - *Link monitor* (nightly, no LLM): fetches every grant link, flags dead links
-    and changed pages.
+  - *Link monitor* (nightly, no LLM): fetches every open grant's link, flags
+    changed pages and links that failed three nights in a row.
+  - *Auto-close* (nightly, no LLM): a grant marked as not recurring is closed a
+    week after its deadline.
   - *Semantic scan* (monthly, or "Scan now"): one Claude call per source
     (`claude-opus-5` + server-side web search). The model compares what it finds
     against the current table and proposes `new` / `update` entries.

@@ -2,7 +2,7 @@
 Approving is the ONLY path from discovery output to the grants table."""
 import json
 
-from .db import get_db, GRANT_FIELDS
+from .db import get_db, PROPOSAL_FIELDS, clean_proposal_fields
 
 
 def compute_diff(proposal: dict) -> list[dict]:
@@ -14,7 +14,7 @@ def compute_diff(proposal: dict) -> list[dict]:
             row = db.execute("SELECT * FROM grants WHERE id=?", (proposal["grant_id"],)).fetchone()
             current = dict(row) if row else {}
     diff = []
-    for field in GRANT_FIELDS:
+    for field in PROPOSAL_FIELDS:
         if field in payload:
             old = current.get(field)
             if str(old or "") != str(payload[field] or ""):
@@ -28,7 +28,7 @@ def approve(proposal_id: int) -> bool:
         if not p:
             return False
         payload = json.loads(p["payload"] or "{}")
-        fields = {k: v for k, v in payload.items() if k in GRANT_FIELDS}
+        fields = clean_proposal_fields(payload)
 
         if p["kind"] == "new":
             if not fields.get("name"):

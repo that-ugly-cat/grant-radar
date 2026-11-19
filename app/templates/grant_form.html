@@ -32,6 +32,13 @@
         {% for s in ['open','closed','archived'] %}<option value="{{ s }}" {% if (grant.status or 'open') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select>
     </label>
+    <label title="A grant that does not recur is closed automatically a week after its deadline">Recurring
+      <select name="recurring">
+        <option value="" {% if not grant.recurring %}selected{% endif %}>not set</option>
+        <option value="yes" {% if grant.recurring == 'yes' %}selected{% endif %}>yes — further editions expected</option>
+        <option value="no" {% if grant.recurring == 'no' %}selected{% endif %}>no — one-off or final call</option>
+      </select>
+    </label>
     <div class="span2 actions">
       <button type="submit">Save</button>
       <a class="btn muted" href="/app">Cancel</a>

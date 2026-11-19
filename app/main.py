@@ -5,7 +5,8 @@
 - MCP mounted at /mcp, reachable either with X-API-Key header or via
   capability URL /mcp/k/{key} (pattern Contrarian): the middleware validates
   the key, rewrites the path, and the MCP app stays auth-unaware.
-- In-app discovery: nightly link monitor + monthly LLM scan (APScheduler).
+- In-app discovery: nightly auto-close and link monitor + monthly LLM scan
+  (APScheduler).
 """
 from contextlib import asynccontextmanager
 
@@ -19,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from .auth import AUTH_MODE, bootstrap_admin, check_api_key, gateway_mode
-from .db import init_db
+from .db import auto_close_expired, init_db
 from .discovery.link_monitor import run_link_monitor
 from .discovery.scanner import run_scan
 from .mcp_server import build_asgi_app, mcp
@@ -33,6 +34,11 @@ async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
     if os.environ.get("GR_SCHEDULER", "1") == "1":
+        # One-off calls past their deadline close by themselves: now, so a
+        # redeploy does not wait for the night, and then every night before
+        # the link monitor, which skips closed rows.
+        auto_close_expired()
+        scheduler.add_job(auto_close_expired, CronTrigger(hour=2, minute=50), id="auto_close")
         scheduler.add_job(run_link_monitor, CronTrigger(hour=3, minute=0), id="link_monitor")
         # Scansione semantica mensile: primo del mese, 04:00.
         scheduler.add_job(run_scan, CronTrigger(day=1, hour=4, minute=0), id="llm_scan")
@@ -121,7 +127,8 @@ def healthz():
     """Liveness, and it stays outside any gate.
 
     Not monitoring: it says the process answers, not that the nightly link
-    monitor ran or that the monthly scan did anything. Those live in scan_log.
+    monitor ran or that the monthly scan did anything. Those live in scan_log,
+    and a scan that failed shows as a banner on every signed-in page.
     """
     return {"ok": True, "mode": AUTH_MODE}
 

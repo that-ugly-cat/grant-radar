@@ -239,3 +239,6 @@ code.key {
 .login-card .title { font-size: 1.05rem; font-weight: 700; color: var(--title-strong); margin-bottom: 0.25rem; }
 .login-card .sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.6rem; line-height: 1.55; }
 @media (max-width: 700px) { header, main, footer { padding-left: 1.2rem; padding-right: 1.2rem; } .grid2 { grid-template-columns: 1fr; } .span2 { grid-column: span 1; } }
+
+/* A failed scan, on every signed-in page: the log alone went unread for two months. */
+.scan-alert { border-left: 4px solid var(--danger-border); }

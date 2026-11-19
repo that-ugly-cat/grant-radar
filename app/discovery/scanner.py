@@ -8,7 +8,7 @@ from datetime import date
 
 import anthropic
 
-from ..db import get_db, grants_digest, GRANT_FIELDS
+from ..db import clean_proposal_fields, get_db, grants_digest, GRANT_FIELDS
 
 MODEL = os.environ.get("GR_MODEL", "claude-opus-5")
 MAX_TURNS = 8
@@ -16,7 +16,17 @@ MAX_WEB_SEARCHES = 12
 
 # Structured proposals arrive via a strict client tool: web search + strict tool
 # use are compatible, and validation happens at the tool-call layer.
+# Strict schemas cap the number of union-typed parameters at 16: twelve
+# descriptive fields plus these two leave room for two more, not for a dozen.
 _FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS}
+_FIELD_PROPS["status"] = {
+    "type": ["string", "null"], "enum": ["open", "closed", None],
+    "description": "closed = the scheme ended or this was its last call; open = a closed row has a new call",
+}
+_FIELD_PROPS["recurring"] = {
+    "type": ["string", "null"], "enum": ["yes", "no", None],
+    "description": "yes = further editions are expected; no = one-off or final call",
+}
 
 SUBMIT_TOOL = {
     "name": "submit_proposals",
@@ -74,6 +84,14 @@ Rules:
 - For kind=update, set grant_id to the digest ID and fill ONLY the fields that changed (null for the rest).
 - For kind=new, fill every field you found (null when unknown). deadline_date is ISO YYYY-MM-DD or null; \
 deadline is the human-readable form; deadline_logic describes recurrence (e.g. "annual, usually October").
+- recurring says whether the scheme has a next edition: "yes" for annual, biannual or rolling schemes, \
+"no" for a one-off or final call. Set it on every kind=new, and propose it as an update for any digest \
+row where it is null and you could establish it. A row with recurring="no" is closed automatically once \
+its deadline has passed, so say "no" only when the funder says so or no further edition is announced.
+- status: when a tracked scheme was discontinued, or its last call has closed with no next edition, \
+propose status="closed" (and recurring="no") instead of writing it into the deadline text. When a row \
+with status="closed" has a new call, propose status="open" together with the new deadline. Otherwise \
+leave rows with status closed or archived alone.
 - Skip calls that are clearly out of scope, closed with no next edition, or reserved to categories the \
 institute cannot apply to.
 - Be conservative: a wrong proposal costs review time. Use confidence=low when unsure.
@@ -112,7 +130,7 @@ def _store_proposals(source: dict, proposals: list[dict]) -> int:
     stored = 0
     with get_db() as db:
         for p in proposals:
-            fields = {k: v for k, v in (p.get("fields") or {}).items() if v not in (None, "")}
+            fields = clean_proposal_fields(p.get("fields"))
             kind, grant_id = p.get("kind"), p.get("grant_id")
             if kind not in ("new", "update") or (kind == "update" and not grant_id):
                 continue
@@ -183,13 +201,22 @@ def run_scan(source_id: int | None = None) -> list[dict]:
     sources = [dict(r) for r in rows]
 
     results = []
+    auth_failed = False
     for source in sources:
+        if auth_failed:
+            break
         with get_db() as db:
             log_id = db.execute(
                 "INSERT INTO scan_log (source_id) VALUES (?)", (source["id"],)
             ).lastrowid
         try:
             result = scan_source(source)
+        except anthropic.AuthenticationError as e:
+            # A rejected key fails every source the same way: record it once
+            # and stop, instead of logging the same 401 for each of them.
+            auth_failed = True
+            result = {"source": source["name"], "outcome": "error",
+                      "detail": f"API key rejected, scan aborted: {e}"}
         except anthropic.APIError as e:
             result = {"source": source["name"], "outcome": "error", "detail": f"API error: {e}"}
         except Exception as e:  # non far morire lo scheduler per una source rotta

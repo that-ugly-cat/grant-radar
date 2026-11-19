@@ -31,7 +31,7 @@ What a row holds: **name** (the only required field), **funder**, **scope** (fre
 
 Deadlines are two fields on purpose. **Deadline (text)** is what the funder actually says — "Rolling", "1 Oct 2026", "two calls per year". **Deadline (date)** is the next known deadline in ISO form, and it is the one the tool computes on: the table sorts by it with undated rows last, past dates show in red, and it is what the deadline filter reads. **Recurrence** carries the pattern in words ("annual, usually October") so an expired date is still informative.
 
-**Status** is `open`, `closed` or `archived`, set by hand. The status filter adds a computed fifth view: **open** means status open *and* the deadline is in the future or absent, **expired** means status open but the deadline has passed — a row nobody has triaged yet. That is where the radar's homework shows up.
+**Status** is `open`, `closed` or `archived`. You set it by hand, with one exception: a row whose **Recurring** field says `no` — a one-off or final call — is closed automatically a week after its deadline, and the closure is recorded in the approved proposals with the method `auto_close`. A row marked `yes`, or not marked at all, is never closed for you: a recurring scheme past its deadline is waiting for its next date. The status filter adds a computed fifth view: **open** means status open *and* the deadline is in the future or absent, **expired** means status open but the deadline has passed — a row nobody has triaged yet. That is where the radar's homework shows up.
 
 Filters combine — full-text search (name, scope, notes, funder), funder, type, source, status — and every change re-queries the table without reloading the page. The filter state is in the URL, so a filtered view is a bookmark you can share. **Export to Excel** exports the current filter, not the whole table.
 
@@ -59,9 +59,9 @@ The **scan log** at the bottom of the page is the honest record: when each sweep
 
 ## 5. The radar
 
-Three processes, all inside the app, none of them able to write to the table.
+Three discovery processes, all inside the app, none of them able to write to the table. The one thing that does change a row without you is not discovery but a rule: the nightly auto-close of one-off calls, described under Status above.
 
-**Link monitor** — nightly, no language model, no cost. It fetches every grant link (skipping archived rows and rows without one), stores a hash of the readable text, and files a `flag` proposal when a link stops answering or when the page's text changed since the last check. Cosmetic changes are stripped before hashing, so a flag means the content moved. The first check of a new row only records the hash — you get a flag from the second night onwards.
+**Link monitor** — nightly, no language model, no cost. It fetches the link of every open grant (closed and archived rows are skipped, as are rows without one), stores a hash of the readable text, and files a `flag` proposal when a link stops answering or when the page's text changed since the last check. One failed fetch is not a dead link: a link is marked dead, and flagged, after three failed nights in a row, and it is flagged once per outage — acknowledging the flag does not bring it back the next night. Cosmetic changes are stripped before hashing, so a flag means the content moved. The first check of a new row only records the hash — you get a flag from the second night onwards.
 
 **Semantic scan** — monthly (first of the month, 04:00 Zurich), plus *Scan now* on the sources page, for all enabled sources or one. For each source, the model searches the live web, compares what it finds against the digest of the grants that source already watches, and files `new` and `update` proposals with a rationale, the page it read, and a confidence of high, medium or low. It is instructed to be conservative and to mark uncertainty as low confidence, because a wrong proposal costs review time. It is also scoped: the prompt describes an institute working on bioethics, digital health, AI ethics, public health and empirical ethics in Zurich, and calls outside that are meant to be skipped.
 
@@ -117,7 +117,7 @@ Three things do leave the machine, and it is worth knowing which:
 
 ## 10. Good practices
 
-- **Triage the `expired` view, not the inbox.** It is the shortest list in the tool and the only one that means a decision is overdue: either the scheme has a next edition and the date needs updating, or it is over and belongs in `closed`.
+- **Triage the `expired` view, not the inbox.** It is the shortest list in the tool and the only one that means a decision is overdue: either the scheme has a next edition and the date needs updating, or it is over and belongs in `closed`. Setting **Recurring** on a row is what lets the second kind close by itself next time.
 - **Spend your effort on hints, not on sources.** A precise line about what the group can actually apply to improves every future sweep; a fifteenth source mostly adds proposals to reject.
 - **Check before you write a proposal, not after you have planned around a row.** A deadline in this table was true when someone last looked. If a call is about to shape a month of your work, hit *check* and read the page yourself.
 - **Approve the diff, not the rationale.** The rationale is the model's argument and it is usually good; the diff is what will be true tomorrow. Read the fields.

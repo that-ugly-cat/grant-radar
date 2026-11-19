@@ -11,7 +11,8 @@ from fastapi.templating import Jinja2Templates
 from ..auth import (BORANT_LOGOUT_URL, COOKIE_NAME, gateway_mode,
                     get_user_or_none, hash_password, make_token, new_api_key,
                     require_admin, require_user, verify_password)
-from ..db import get_db, status_condition, GRANT_FIELDS
+from ..db import (failed_scan_sources, get_db, status_condition, GRANT_FIELDS,
+                  RECURRING_VALUES, STATUS_VALUES)
 from ..discovery.link_monitor import run_link_monitor
 from ..discovery.scanner import run_scan
 from ..discovery.verifier import verify_grant
@@ -33,6 +34,11 @@ def _render(request: Request, name: str, **ctx) -> HTMLResponse:
         with get_db() as db:
             ctx["pending_count"] = db.execute(
                 "SELECT COUNT(*) AS n FROM proposals WHERE status='pending'").fetchone()["n"]
+    # A scan that fails writes to a log nobody reads: in October and November
+    # 2026 every source answered 401 and the table simply stopped being
+    # refreshed. Signed-in pages say so; the public ones do not run the query.
+    if "scan_failures" not in ctx:
+        ctx["scan_failures"] = failed_scan_sources() if ctx["user"] else []
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -68,7 +74,7 @@ def landing(request: Request):
     # without one — the same page with two behaviours. By not asking, this page
     # is identical in both modes.
     return _render(request, "landing.html", mcp_tools=tool_names(),
-                   user=None, pending_count=None)
+                   user=None, pending_count=None, scan_failures=[])
 
 
 # --- auth ---
@@ -194,6 +200,16 @@ def _all_sources() -> list[dict]:
         return [dict(r) for r in db.execute("SELECT id, name FROM sources ORDER BY name")]
 
 
+def _form_status(form) -> str:
+    raw = form.get("status") or "open"
+    return raw if raw in STATUS_VALUES else "open"
+
+
+def _form_recurring(form) -> str | None:
+    raw = form.get("recurring") or ""
+    return raw if raw in RECURRING_VALUES else None
+
+
 def _form_source_id(form) -> int | None:
     raw = form.get("source_id") or ""
     return int(raw) if raw.isdigit() else None
@@ -202,7 +218,7 @@ def _form_source_id(form) -> int | None:
 EXPORT_COLS = [
     ("Name", "name"), ("Funder", "funder"), ("Scope", "scope"), ("Max amount", "max_amount"),
     ("Duration (months)", "duration_months"), ("Deadline", "deadline"), ("Deadline date", "deadline_date"),
-    ("Recurrence", "deadline_logic"), ("Link", "link"), ("Notes", "notes"), ("Grant start", "grant_start"),
+    ("Recurrence", "deadline_logic"), ("Recurring", "recurring"), ("Link", "link"), ("Notes", "notes"), ("Grant start", "grant_start"),
     ("Type", "primary_type"), ("Source", "source_name"), ("Status", "status"), ("Origin", "origin"),
 ]
 
@@ -257,9 +273,9 @@ async def grant_create(request: Request, user=Depends(require_admin)):
     fields = {k: (form.get(k) or None) for k in GRANT_FIELDS}
     with get_db() as db:
         db.execute(
-            f"INSERT INTO grants ({', '.join(fields)}, source_id, status) "
-            f"VALUES ({', '.join('?' * len(fields))}, ?, ?)",
-            list(fields.values()) + [_form_source_id(form), form.get("status") or "open"],
+            f"INSERT INTO grants ({', '.join(fields)}, source_id, status, recurring) "
+            f"VALUES ({', '.join('?' * len(fields))}, ?, ?, ?)",
+            list(fields.values()) + [_form_source_id(form), _form_status(form), _form_recurring(form)],
         )
     return RedirectResponse("/app", status_code=303)
 
@@ -293,8 +309,10 @@ async def grant_update(request: Request, grant_id: int, user=Depends(require_adm
     sets = ", ".join(f"{k}=?" for k in fields)
     with get_db() as db:
         db.execute(
-            f"UPDATE grants SET {sets}, source_id=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            list(fields.values()) + [_form_source_id(form), form.get("status") or "open", grant_id],
+            f"UPDATE grants SET {sets}, source_id=?, status=?, recurring=?, "
+            f"updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            list(fields.values()) + [_form_source_id(form), _form_status(form),
+                                     _form_recurring(form), grant_id],
         )
     return RedirectResponse("/app", status_code=303)
 

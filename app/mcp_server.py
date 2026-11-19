@@ -13,7 +13,7 @@ import json
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 
-from .db import get_db, status_condition, GRANT_FIELDS
+from .db import clean_proposal_fields, get_db, status_condition
 
 mcp = MCPServer(
     "grant-radar",
@@ -64,7 +64,8 @@ def search_grants(
     Project, Postdoc, PI, Network, PhD, Other) or pass 'none' to match grants
     with no type set. status is deadline-aware: 'open' = status open AND
     deadline in the future or absent; 'expired' = status open but deadline
-    passed; 'closed'/'archived' = manual states; '' = any. Returns a JSON list
+    passed; 'closed' = set by hand, or automatically for a non-recurring call
+    past its deadline; 'archived' = set by hand; '' = any. Returns a JSON list
     sorted by next deadline."""
     # The four fields are the web UI's, not a shorter set of their own: one
     # filter with two behaviours means a search someone learned in the table
@@ -130,7 +131,7 @@ def list_proposals(status: str = "pending") -> str:
 
 def _insert_proposal(kind: str, grant_id: int | None, fields: dict, rationale: str,
                      source_url: str, confidence: str, source_id: int | None) -> int:
-    clean = {k: v for k, v in fields.items() if k in GRANT_FIELDS and v not in (None, "")}
+    clean = clean_proposal_fields(fields)
     with get_db() as db:
         cur = db.execute(
             "INSERT INTO proposals (kind, grant_id, source_id, payload, rationale, source_url, confidence, method) "
@@ -142,10 +143,16 @@ def _insert_proposal(kind: str, grant_id: int | None, fields: dict, rationale: s
 
 @mcp.tool()
 def list_sources() -> str:
-    """Configured discovery sources (id, name, url, hints, enabled). Use the id
-    as source_id when filing proposals that belong to one of these sources."""
+    """Configured discovery sources (id, name, url, hints, enabled,
+    last_scanned_at, last_scan_outcome). Use the id as source_id when filing
+    proposals that belong to one of these sources. last_scan_outcome='error'
+    means the monthly scan is not refreshing that source's grants."""
     with get_db() as db:
-        rows = db.execute("SELECT id, name, url, hints, enabled FROM sources ORDER BY name").fetchall()
+        rows = db.execute(
+            "SELECT s.id, s.name, s.url, s.hints, s.enabled, s.last_scanned_at, "
+            "(SELECT outcome FROM scan_log l WHERE l.source_id = s.id AND l.outcome IS NOT NULL "
+            " ORDER BY l.id DESC LIMIT 1) AS last_scan_outcome "
+            "FROM sources s ORDER BY s.name").fetchall()
     return json.dumps([dict(r) for r in rows], ensure_ascii=False)
 
 
@@ -155,7 +162,9 @@ def propose_grant(fields: dict, rationale: str, source_url: str = "", confidence
     """Propose a NEW grant for the queue (needs human approval in the UI).
     fields: subset of {name, funder, scope, max_amount, duration_months, deadline,
     deadline_date (YYYY-MM-DD), deadline_logic, link, notes, grant_start,
-    primary_type}. name is required. source_id (see list_sources) links the
+    primary_type, recurring ('yes' | 'no': whether further editions are
+    expected; a 'no' row is closed automatically after its deadline)}. name is
+    required. source_id (see list_sources) links the
     proposal to the discovery source it belongs to; on approval the grant
     inherits it."""
     if not fields.get("name"):
@@ -168,12 +177,16 @@ def propose_grant(fields: dict, rationale: str, source_url: str = "", confidence
 def propose_update(grant_id: int, fields: dict, rationale: str, source_url: str = "",
                    confidence: str = "medium", source_id: int | None = None) -> str:
     """Propose an UPDATE to an existing grant (needs human approval in the UI).
-    fields: only the fields that should change. source_id (see list_sources)
-    is inherited by the grant on approval if the grant has none yet."""
+    fields: only the fields that should change, among those of propose_grant
+    plus status ('open' | 'closed' | 'archived') — propose status='closed' for a
+    discontinued scheme or a one-off call that is over. source_id (see
+    list_sources) is inherited by the grant on approval if the grant has none
+    yet."""
     with get_db() as db:
         if not db.execute("SELECT id FROM grants WHERE id=?", (grant_id,)).fetchone():
             return json.dumps({"ok": False, "error": f"grant {grant_id} not found"})
-    if not fields:
-        return json.dumps({"ok": False, "error": "fields is empty"})
+    if not clean_proposal_fields(fields):
+        return json.dumps({"ok": False, "error": "no_valid_fields",
+                           "detail": "fields is empty, or holds only unknown fields or values"})
     pid = _insert_proposal("update", grant_id, fields, rationale, source_url, confidence, source_id)
     return json.dumps({"ok": True, "proposal_id": pid})

@@ -8,12 +8,10 @@ from datetime import date
 
 import anthropic
 
-from ..db import get_db, GRANT_FIELDS
-from .scanner import MODEL
+from ..db import clean_proposal_fields, get_db
+from .scanner import MODEL, _FIELD_PROPS
 
 MAX_TURNS = 6
-
-_FIELD_PROPS = {f: {"type": ["string", "null"]} for f in GRANT_FIELDS}
 
 SUBMIT_TOOL = {
     "name": "submit_verification",
@@ -60,7 +58,11 @@ Rules:
 - Compare against what you actually read; do not guess. deadline_date is ISO YYYY-MM-DD.
 - Report ONLY fields whose stored value is wrong or outdated; leave everything else null.
 - A deadline in the past with a known next edition -> propose the new deadline/deadline_date.
-- A scheme that was discontinued -> propose notes saying so (the human decides on status).
+- recurring is "yes" when further editions are expected and "no" for a one-off or final call; propose \
+it when the stored value is null or wrong. A row with recurring="no" is closed automatically once its \
+deadline has passed.
+- A scheme that was discontinued, or whose last call closed with no next edition -> propose \
+status="closed" and recurring="no". A closed row with a new call -> status="open" and the new deadline.
 - If everything checks out, matches=true with empty changes.
 - Call submit_verification exactly once when done."""
 
@@ -69,7 +71,7 @@ def _user_prompt(grant: dict) -> str:
     record = {k: grant.get(k) for k in ["id", "name", "funder", "scope", "max_amount",
                                         "duration_months", "deadline", "deadline_date",
                                         "deadline_logic", "link", "notes", "grant_start",
-                                        "primary_type", "status"]}
+                                        "primary_type", "status", "recurring"]}
     return (
         f"Today is {date.today().isoformat()}.\n\n"
         f"STORED RECORD (JSON):\n{json.dumps(record, ensure_ascii=False, default=str)}"
@@ -79,8 +81,7 @@ def _user_prompt(grant: dict) -> str:
 def _apply_result(grant: dict, result: dict) -> dict:
     """Stamp the verification; file an update proposal if there are differences.
     Separated from the LLM loop so it can be unit-tested."""
-    fields = {k: v for k, v in (result.get("fields") or {}).items()
-              if k in GRANT_FIELDS and v not in (None, "")}
+    fields = clean_proposal_fields(result.get("fields"))
     # Tieni solo i campi davvero diversi dal record corrente.
     fields = {k: v for k, v in fields.items() if str(grant.get(k) or "") != str(v or "")}
     matches = bool(result.get("matches")) or not fields
