@@ -39,7 +39,7 @@
     <button type="button" class="theme-toggle" aria-label="Switch theme" title="Switch theme" aria-pressed="false"><span class="theme-icon-dark" aria-hidden="true">&#9788;</span><span class="theme-icon-light" aria-hidden="true">&#9790;</span></button>
   </nav>
 </header>
-<main>
+<main class="{% block main_class %}{% endblock %}">
 {% if scan_failures %}
 <div class="card scan-alert" role="alert">
   <strong>The last scan failed for {{ scan_failures|length }} source{{ 's' if scan_failures|length != 1 }}</strong>

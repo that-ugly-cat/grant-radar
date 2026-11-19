@@ -15,19 +15,32 @@
     <span class="chip conf-{{ p.confidence }}">{{ p.confidence }}</span>
     <span class="chip">{{ p.method }}</span>
     {% if p.grant_name %}<strong>{{ p.grant_name }}</strong>{% elif p.kind == 'new' %}<strong>{{ (p.diff | selectattr('field', 'equalto', 'name') | map(attribute='new') | first) or 'new grant' }}</strong>{% endif %}
-    <span class="muted small">{{ p.created_at }}</span>
+    <span class="muted small when">{{ p.created_at }}</span>
   </div>
   <p>{{ p.rationale }}</p>
-  {% if p.source_url %}<p class="small"><a href="{{ p.source_url }}" target="_blank" rel="noopener">{{ p.source_url }}</a></p>{% endif %}
+  {% if p.source_url %}<p class="small break"><a href="{{ p.source_url }}" target="_blank" rel="noopener">{{ p.source_url }}</a></p>{% endif %}
   {% if p.diff %}
+  <div class="table-wrap">
   <table class="diff">
+    {# A new grant has nothing to compare with: two columns, not a column of dashes. #}
+    {% if p.kind == 'new' %}
+    <colgroup><col class="c-field"><col></colgroup>
+    <thead><tr><th>Field</th><th>Proposed</th></tr></thead>
+    <tbody>
+      {% for d in p.diff %}
+      <tr><td>{{ d.field }}</td><td class="new">{{ d.new or '—' }}</td></tr>
+      {% endfor %}
+    {% else %}
+    <colgroup><col class="c-field"><col><col></colgroup>
     <thead><tr><th>Field</th><th>Current</th><th>Proposed</th></tr></thead>
     <tbody>
       {% for d in p.diff %}
-      <tr><td>{{ d.field }}</td><td class="old">{{ d.old or '—' }}</td><td class="new">{{ d.new or '—' }}</td></tr>
+      <tr><td>{{ d.field }}</td>{% if d.old %}<td class="old">{{ d.old }}</td>{% else %}<td class="muted">—</td>{% endif %}<td class="new">{{ d.new or '—' }}</td></tr>
       {% endfor %}
+    {% endif %}
     </tbody>
   </table>
+  </div>
   {% endif %}
   {% if p.status == 'pending' and user.role == 'admin' %}
   <div class="actions">

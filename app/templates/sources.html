@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block main_class %}wide{% endblock %}
 {% block content %}
 <div class="toolbar">
   <h1>Sources</h1>
@@ -10,16 +11,19 @@
   {% endif %}
 </div>
 
-<table>
-  <thead><tr><th>Name</th><th>URL</th><th>Hints</th><th>Last scan</th><th>Enabled</th>{% if user.role == 'admin' %}<th></th>{% endif %}</tr></thead>
+<div class="table-wrap">
+{% if scan_running %}<p class="small muted">A scan is running: sources appear in the log below as they finish, and a second scan will not start until this one is done.</p>{% endif %}
+<table class="sources stack">
+  <colgroup><col class="c-sname"><col class="c-surl"><col class="c-hints"><col class="c-when"><col class="c-flag">{% if user.role == 'admin' %}<col class="c-sactions">{% endif %}</colgroup>
+  <thead><tr><th>Name</th><th>URL</th><th>Hints</th><th>Last scan</th><th class="center">Enabled</th>{% if user.role == 'admin' %}<th></th>{% endif %}</tr></thead>
   <tbody>
     {% for s in sources %}
     <tr class="{% if not s.enabled %}row-disabled{% endif %}">
-      <td><strong>{{ s.name }}</strong></td>
-      <td class="small">{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a>{% else %}—{% endif %}</td>
-      <td class="small">{{ s.hints or '—' }}</td>
-      <td class="small">{{ s.last_scanned_at or 'never' }}</td>
-      <td>{{ '✓' if s.enabled else '—' }}</td>
+      <td class="cell-name"><strong>{{ s.name }}</strong></td>
+      <td data-label="URL" class="small break">{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.url }}</a>{% else %}—{% endif %}</td>
+      <td data-label="Hints" class="small"><div class="clamp3" title="{{ s.hints or '' }}">{{ s.hints or '—' }}</div></td>
+      <td data-label="Last scan" class="small nowrap-wide">{{ s.last_scanned_at or 'never' }}</td>
+      <td data-label="Enabled" class="center">{{ '✓' if s.enabled else '—' }}</td>
       {% if user.role == 'admin' %}
       <td class="actions-inline">
         <a class="btn small muted" href="/sources/{{ s.id }}/edit">edit</a>
@@ -30,10 +34,11 @@
       {% endif %}
     </tr>
     {% else %}
-    <tr><td colspan="6" class="muted">No sources yet. Add one: the radar only looks where you point it.</td></tr>
+    <tr class="empty"><td colspan="6" class="muted">No sources yet. Add one: the radar only looks where you point it.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 {% if user.role == 'admin' %}
 <div class="card">
@@ -48,15 +53,19 @@
 {% endif %}
 
 <h2>Scan log</h2>
-<table>
+<div class="table-wrap">
+<table class="scanlog stack">
+  <colgroup><col class="c-when"><col class="c-sname"><col class="c-outcome"><col></colgroup>
   <thead><tr><th>When</th><th>Source</th><th>Outcome</th><th>Detail</th></tr></thead>
   <tbody>
     {% for l in scan_log %}
-    <tr><td class="small">{{ l.started_at }}</td><td>{{ l.source_name or '—' }}</td>
-        <td>{{ l.outcome or 'running…' }}</td><td class="small">{{ l.detail or '' }}</td></tr>
+    <tr><td class="small nowrap-wide cell-name">{{ l.started_at }}</td><td data-label="Source">{{ l.source_name or '—' }}</td>
+        <td data-label="Outcome"><span class="chip {{ 'conf-high' if l.outcome == 'ok' else ('conf-low' if l.outcome == 'error' else '') }}">{{ l.outcome or 'running…' }}</span></td>
+        <td data-label="Detail" class="small break"><div class="clamp3" title="{{ l.summary }}">{{ l.summary }}</div></td></tr>
     {% else %}
-    <tr><td colspan="4" class="muted">No scans yet.</td></tr>
+    <tr class="empty"><td colspan="4" class="muted">No scans yet.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

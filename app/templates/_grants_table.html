@@ -1,37 +1,44 @@
-<p class="small" style="text-align: right; margin: 0.2rem 0;">
+<p class="table-meta small">
+  <span class="muted">{{ grants|length }} grant{{ '' if grants|length == 1 else 's' }}</span>
   <a href="/grants/export.xlsx?q={{ q|urlencode }}&funder={{ f_funder|urlencode }}&primary_type={{ f_type|urlencode }}&source={{ f_source|urlencode }}&status={{ f_status|urlencode }}">⬇ Export to Excel (current filter)</a>
 </p>
-<table>
+<div class="table-wrap">
+<table class="grants stack">
+  <colgroup>
+    <col class="c-name"><col class="c-funder"><col class="c-scope"><col class="c-max"><col class="c-deadline">
+    <col class="c-type"><col class="c-link">{% if user.role == 'admin' %}<col class="c-actions">{% endif %}
+  </colgroup>
   <thead>
     <tr>
       <th>Grant</th><th>Funder</th><th>Scope</th><th>Max</th><th>Deadline</th>
-      <th>Type</th><th>Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
+      <th>Type</th><th class="center">Link</th>{% if user.role == 'admin' %}<th></th>{% endif %}
     </tr>
   </thead>
   <tbody>
     {% for g in grants %}
-    <tr class="row-click {% if g.link_status == 'dead' %}row-dead{% endif %}"
+    <tr class="row-click {% if g.link_status == 'dead' %}row-dead{% endif %} {% if g.status != 'open' %}row-closed{% endif %}"
         hx-get="/grants/{{ g.id }}/detail" hx-target="#modal"
         hx-trigger="click[!event.target.closest('a') && !event.target.closest('button')]">
-      <td><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Entered through the proposals queue (not typed into the form). What filed the proposal is on the proposals page.">📡</span>{% endif %}
-        {% if g.notes %}<div class="muted small">{{ g.notes }}</div>{% endif %}</td>
-      <td>{{ g.funder or '—' }}</td>
-      <td class="small">{{ g.scope or '—' }}</td>
-      <td class="small">{{ g.max_amount or '—' }}</td>
-      <td>
-        {% if g.deadline_date %}<span class="deadline {% if g.deadline_date < today %}deadline-past{% endif %}">{{ g.deadline_date }}</span>
-        {% elif g.deadline %}{{ g.deadline }}{% else %}—{% endif %}
-        {% if g.deadline_logic %}<div class="muted small">{{ g.deadline_logic }}</div>{% endif %}
-      </td>
-      <td>{{ g.primary_type or '—' }}</td>
-      <td>{% if g.link %}<a href="{{ g.link }}" target="_blank" rel="noopener">↗{% if g.link_status == 'dead' %}💀{% endif %}</a>{% else %}—{% endif %}</td>
+      <td class="cell-name"><strong>{{ g.name }}</strong>{% if g.origin == 'discovery' %} <span class="chip" title="Entered through the proposals queue (not typed into the form). What filed the proposal is on the proposals page.">📡</span>{% endif %}{% if g.status != 'open' %} <span class="chip">{{ g.status }}</span>{% endif %}
+        {% if g.notes %}<div class="muted small clamp2">{{ g.notes }}</div>{% endif %}</td>
+      <td data-label="Funder">{{ g.funder or '—' }}</td>
+      <td data-label="Scope" class="small m-hide"><div class="clamp3">{{ g.scope or '—' }}</div></td>
+      <td data-label="Max" class="small m-hide"><div class="clamp3">{{ g.max_amount or '—' }}</div></td>
+      <td data-label="Deadline"><div>
+        {% if g.deadline_date %}<span class="deadline {% if g.deadline_date < today and g.status == 'open' %}deadline-past{% endif %}">{{ g.deadline_date }}</span>
+        {% elif g.deadline %}<span class="clamp2">{{ g.deadline }}</span>{% else %}—{% endif %}
+        {% if g.deadline_logic %}<div class="muted small clamp2">{{ g.deadline_logic }}</div>{% endif %}
+      </div></td>
+      <td data-label="Type">{{ g.primary_type or '—' }}</td>
+      <td data-label="Link" class="center">{% if g.link %}<a class="ext" href="{{ g.link }}" target="_blank" rel="noopener" title="Open the call's page" aria-label="Open the call's page">↗{% if g.link_status == 'dead' %}💀{% endif %}</a>{% else %}—{% endif %}</td>
       {% if user.role == 'admin' %}<td class="actions-inline">
         <a class="btn small muted" href="/grants/{{ g.id }}/edit">edit</a>
         <form method="post" action="/grants/{{ g.id }}/check"><button class="small" type="submit" title="LLM check: fetch the page, compare, file a diff proposal if needed">check</button></form>
       </td>{% endif %}
     </tr>
     {% else %}
-    <tr><td colspan="8" class="muted">No grants found.</td></tr>
+    <tr class="empty"><td colspan="8" class="muted">No grants found.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>

@@ -14,7 +14,7 @@ from ..auth import (BORANT_LOGOUT_URL, COOKIE_NAME, gateway_mode,
 from ..db import (failed_scan_sources, get_db, status_condition, GRANT_FIELDS,
                   RECURRING_VALUES, STATUS_VALUES)
 from ..discovery.link_monitor import run_link_monitor
-from ..discovery.scanner import run_scan
+from ..discovery.scanner import run_scan, scan_running
 from ..discovery.verifier import verify_grant
 from ..mcp_server import tool_names
 from ..proposals import approve, compute_diff, reject
@@ -362,6 +362,20 @@ def proposal_reject(proposal_id: int, user=Depends(require_admin)):
 
 # --- sources & discovery ---
 
+def _scan_summary(detail: str | None) -> str:
+    """One readable line from a scan_log detail, which is stored as the JSON of
+    the whole result. Anything that is not that JSON is shown as it is."""
+    try:
+        d = json.loads(detail or "")
+    except ValueError:
+        return detail or ""
+    if not isinstance(d, dict):
+        return detail or ""
+    if d.get("outcome") == "ok":
+        return f"{d.get('proposed', 0)} proposed, {d.get('stored', 0)} stored"
+    return str(d.get("detail") or detail)
+
+
 @router.get("/sources", response_class=HTMLResponse)
 def sources_page(request: Request, user=Depends(require_user)):
     with get_db() as db:
@@ -369,7 +383,9 @@ def sources_page(request: Request, user=Depends(require_user)):
         log = [dict(r) for r in db.execute(
             "SELECT l.*, s.name AS source_name FROM scan_log l "
             "LEFT JOIN sources s ON s.id = l.source_id ORDER BY l.started_at DESC LIMIT 20").fetchall()]
-    return _render(request, "sources.html", sources=sources, scan_log=log)
+    for entry in log:
+        entry["summary"] = _scan_summary(entry["detail"])
+    return _render(request, "sources.html", sources=sources, scan_log=log, scan_running=scan_running())
 
 
 @router.post("/sources/new")

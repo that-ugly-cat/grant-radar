@@ -238,7 +238,118 @@ code.key {
 }
 .login-card .title { font-size: 1.05rem; font-weight: 700; color: var(--title-strong); margin-bottom: 0.25rem; }
 .login-card .sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.6rem; line-height: 1.55; }
-@media (max-width: 700px) { header, main, footer { padding-left: 1.2rem; padding-right: 1.2rem; } .grid2 { grid-template-columns: 1fr; } .span2 { grid-column: span 1; } }
 
 /* A failed scan, on every signed-in page: the log alone went unread for two months. */
 .scan-alert { border-left: 4px solid var(--danger-border); }
+
+
+/* ---- layout pass, November 2026 --------------------------------------------
+   The grants table used to size its columns from their content: at 1280px it
+   came out 1575px wide and the whole page scrolled sideways. Columns now have
+   declared widths, long text wraps or is clamped (the detail card has it in
+   full), and under 700px a table marked .stack turns into one card per row. */
+main.wide { max-width: 92rem; }
+.table-wrap { overflow-x: auto; margin: 0.8rem 0 1.5rem; }
+.table-wrap > table { margin: 0; }
+.table-meta { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0.6rem 0 0; }
+td, th { overflow-wrap: anywhere; }
+th.center, td.center { text-align: center; }
+.break { word-break: break-all; }
+.clamp2, .clamp3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp2 { -webkit-line-clamp: 2; line-clamp: 2; }
+.clamp3 { -webkit-line-clamp: 3; line-clamp: 3; }
+.deadline { white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr.row-closed td { opacity: 0.6; }
+a.ext { display: inline-block; white-space: nowrap; min-width: 1.8rem; padding: 0.1rem 0.3rem; text-align: center; text-decoration: none; border-radius: 4px; }
+a.ext:hover { background: var(--card-hover); }
+.proposal-head .when { margin-left: auto; white-space: nowrap; }
+.card > h1:first-child, .card > h2:first-child { margin-top: 0.2rem; }
+
+table.grants, table.sources, table.scanlog, table.diff { table-layout: fixed; }
+table.grants { min-width: 58rem; }
+table.grants col.c-name { width: 27%; }
+table.grants col.c-funder { width: 12%; }
+table.grants col.c-scope { width: 19%; }
+table.grants col.c-max { width: 11%; }
+table.grants col.c-deadline { width: 17%; }
+table.grants col.c-type { width: 5.5rem; }
+table.grants col.c-link { width: 3.5rem; }
+table.grants col.c-actions { width: 7.6rem; }
+table.sources { min-width: 52rem; }
+col.c-sname { width: 13rem; }
+col.c-surl { width: 22%; }
+col.c-when { width: 9.5rem; }
+col.c-flag { width: 5rem; }
+col.c-sactions { width: 13.5rem; }
+col.c-outcome { width: 6.5rem; }
+table.scanlog { min-width: 40rem; }
+table.diff col.c-field { width: 9rem; }
+td.actions-inline { text-align: right; }
+
+/* filters: the search field takes the slack, no select grows past its share */
+.grant-filters { flex: 1 1 28rem; }
+.grant-filters input[type="search"] { flex: 1 1 11rem; min-width: 9rem; }
+.grant-filters select { flex: 0 1 11rem; min-width: 0; max-width: 13rem; text-overflow: ellipsis; }
+
+@media (max-width: 900px) {
+  .tagline-top { display: none; }
+}
+
+@media (max-width: 700px) {
+  header, main, footer { padding-left: 1rem; padding-right: 1rem; }
+  header { padding-top: 0.8rem; padding-bottom: 0.8rem; gap: 0.5rem 1rem; align-items: center; }
+  nav { margin-left: 0; width: 100%; flex-wrap: wrap; gap: 0.3rem 1rem; align-items: center; }
+  nav a { padding: 0.25rem 0; }
+  nav .theme-toggle { margin-left: auto; }
+  main { padding-top: 1.2rem; }
+  .grid2 { grid-template-columns: 1fr; }
+  .span2 { grid-column: span 1; }
+  /* 16px stops iOS from zooming the page when a field takes focus */
+  input, select, textarea { font-size: 16px; }
+  button, .btn { padding: 0.55rem 1rem; }
+  button.small, .btn.small { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+
+  .toolbar { align-items: stretch; }
+  .grant-filters { display: grid; grid-template-columns: 1fr 1fr; flex-basis: 100%; }
+  .grant-filters input[type="search"] { grid-column: 1 / -1; }
+  .grant-filters select, .filters input, .filters select { width: 100%; max-width: none; }
+  .toolbar > .btn { text-align: center; }
+  .inline-form > * { flex: 1 1 100%; }
+
+  /* one card per row */
+  .table-wrap { overflow-x: visible; }
+  table.stack { min-width: 0; table-layout: auto; }
+  table.stack colgroup, table.stack thead { display: none; }
+  table.stack, table.stack tbody { display: block; }
+  table.stack tr {
+    display: block; margin: 0 0 0.7rem; padding: 0.7rem 0.9rem;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  }
+  table.stack tr.row-dead { border-color: var(--danger-border); }
+  table.stack tr.row-dead td, table.stack tr:hover td { background: transparent; }
+  table.stack td { display: flex; gap: 0.7rem; padding: 0.22rem 0; border: 0; text-align: left; }
+  table.stack td[data-label]::before {
+    content: attr(data-label); flex: 0 0 5.2rem; padding-top: 0.15rem;
+    color: var(--faint); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  table.stack td.cell-name { display: block; padding-bottom: 0.4rem; font-size: 0.95rem; }
+  table.stack td.actions-inline { justify-content: flex-end; flex-wrap: wrap; padding-top: 0.5rem; white-space: normal; }
+  table.stack tr.empty td { display: block; }
+  table.stack td > div, table.stack td > form { min-width: 0; flex: 1 1 auto; }
+  table.stack td.actions-inline > * { flex: 0 0 auto; margin-left: 0; }
+  table.stack td.m-hide { display: none; }
+  table.stack .inline-form { flex-wrap: nowrap; }
+  table.stack .inline-form input { flex: 1 1 auto; min-width: 0; }
+  table.stack .inline-form button { flex: 0 0 auto; }
+  /* a stacked table inside a card: the row is the inner surface, not a second card */
+  .card table.stack tr { background: var(--bg); }
+
+  .modal-overlay { padding: 1rem 0.6rem; }
+  .modal-card { padding: 1rem 1rem 1.2rem; }
+  table.detail, table.detail tbody, table.detail tr, table.detail th, table.detail td { display: block; width: auto; }
+  table.detail th { border: 0; padding: 0.55rem 0 0; }
+  table.detail td { padding: 0.1rem 0 0.55rem; }
+  .actions { flex-wrap: wrap; }
+  table.diff col.c-field { width: 5.5rem; }
+  .proposal-head .when { margin-left: 0; flex-basis: 100%; }
+}

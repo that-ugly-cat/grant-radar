@@ -4,6 +4,7 @@ and files `new` / `update` proposals. Nothing touches the grants table directly:
 everything lands in the proposals queue for human review."""
 import json
 import os
+import threading
 from datetime import date
 
 import anthropic
@@ -196,8 +197,29 @@ def scan_source(source: dict) -> dict:
     return {"source": source["name"], "outcome": "ok", "proposed": len(proposals), "stored": stored}
 
 
+# One scan at a time. On 19 November 2026 "Scan now" was submitted twice and
+# two full runs walked the sources side by side: twice the cost, and the second
+# run's proposals were mostly dropped as duplicates of the first.
+_scan_lock = threading.Lock()
+
+
+def scan_running() -> bool:
+    return _scan_lock.locked()
+
+
 def run_scan(source_id: int | None = None) -> list[dict]:
-    """Scan one source or every enabled source. Called by the scheduler and by 'Scan now'."""
+    """Scan one source or every enabled source. Called by the scheduler and by
+    'Scan now'. Returns at once, having done nothing, if a scan is running."""
+    if not _scan_lock.acquire(blocking=False):
+        print("[scan] skipped: another scan is already running")
+        return []
+    try:
+        return _run_scan(source_id)
+    finally:
+        _scan_lock.release()
+
+
+def _run_scan(source_id: int | None = None) -> list[dict]:
     with get_db() as db:
         if source_id:
             rows = db.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchall()
