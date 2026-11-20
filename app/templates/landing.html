@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <p class="lead">
-Grant Radar tracks funding opportunities for an academic research group — and
-keeps itself current. The table is curated by hand; the radar sweeps the
-funders' sites on its own, once a month, and files what it finds as
-<em>proposals</em>. Nothing written by a machine reaches the table until a
-human has read the diff and clicked approve.
+Grant Radar tracks funding opportunities — for a research group, or for one
+researcher — and keeps itself current. The table is curated by hand; the radar
+sweeps the funders' sites on its own, once a month, and files what it finds as
+<em>proposals</em>. Nothing the radar finds reaches the table until a human
+has read the diff and clicked approve.
 </p>
 
 <div class="pillars">
@@ -17,6 +17,16 @@ human has read the diff and clicked approve.
     field-by-field diff, and a decided proposal is never rewritten: it stays
     readable as the radar's trail. Deleting a grant does take its proposals
     with it, so a scheme that is over goes to <em>archived</em> instead.</span></div>
+  </div>
+  <div class="pillar">
+    <div class="pillar-icon">◫</div>
+    <div class="pillar-text"><strong>Each group has its own radar</strong>
+    <span>Grants, sources and proposals live in workspaces, personal or
+    shared, and nothing crosses from one to another. A workspace says in its
+    own words what it works on, and the radar rates every call it finds as a
+    high, medium or low fit against that — separately from how sure it is of
+    the facts. Scans run on the Anthropic key of whoever pays for the
+    workspace, not on a key of the server's.</span></div>
   </div>
   <div class="pillar">
     <div class="pillar-icon">📡</div>
@@ -55,39 +65,52 @@ human has read the diff and clicked approve.
       stops there, and what crossed it and why stays on record forever.</p>
       <p><strong>What the AI does and doesn't do.</strong> Once a month, an AI
       model with live web-search access visits each configured source — a
-      funder's website plus a line of hints about what matters to the group.
-      It compares what it finds against the current table and writes up
+      funder's website plus a line of hints about where to look. It reads the
+      workspace's own description of what it works on, which is the only
+      definition of relevance it has, compares what it finds against the
+      current table and writes up
       proposals: a new call, with its amounts and deadlines and a link; or an
       update, say next year's deadline for a recurring scheme. Each proposal
       carries its reasoning and the page it came from. What the AI cannot do
       is write into the table: it has no such button, the same way a smoke
       detector can't rebuild your kitchen. Someone reads the proposal, sees
       exactly which fields would change, and approves or rejects it.</p>
+      <p><strong>The one thing that happens by itself.</strong> A call marked
+      as not recurring is closed a week after its deadline. That is a rule, not
+      a finding: nothing is discovered, nothing is guessed, and the closure is
+      written into the same trail as everything else.</p>
     </div>
   </details>
   <details class="explainer">
     <summary><span class="badge-r geek">geek mode</span> Stack, discovery loop, MCP surface</summary>
     <div class="body">
       <p><strong>Stack.</strong> FastAPI + SQLite + HTMX/Jinja2, JWT cookie
-      auth, Docker behind Caddy. Four working tables: <code>grants</code>,
-      <code>proposals</code> (kind new/update/flag, JSON payload, rationale,
-      confidence, method), <code>sources</code>, <code>users</code> — plus
-      <code>scan_log</code>. A decided proposal is never rewritten and stays
+      auth, Docker behind Caddy. The working tables: <code>workspaces</code>
+      and <code>memberships</code> (read, write, admin, per workspace),
+      <code>grants</code>, <code>proposals</code> (kind new/update/flag, JSON
+      payload, rationale, confidence, method) and <code>sources</code>, each
+      row carrying its <code>workspace_id</code>, <code>users</code> — plus
+      <code>scan_log</code>. A workspace the caller is not a member of answers
+      404 on every surface, like one that does not exist. A decided proposal is never rewritten and stays
       readable under the <em>approved</em> and <em>rejected</em> filters, which
       is the trail; the one thing that removes it is deleting its grant, which
       cascades on <code>grant_id</code> rather than leaving a proposal pointing
       at a row that is gone. <code>archived</code> keeps both the row and its
       trail.</p>
       <p><strong>Discovery, two engines.</strong> A nightly link monitor
-      (httpx, no LLM) fetches every tracked link, hashes the readable text,
-      and files <code>flag</code> proposals for dead links and changed pages.
-      A monthly semantic scan runs one agentic loop per source:
+      (httpx, no LLM) fetches every open grant's link, hashes the readable
+      text, and files <code>flag</code> proposals for changed pages and for
+      links that failed three nights in a row, once per outage.
+      A monthly semantic scan runs one agentic loop per source, on the
+      Anthropic key of the workspace's paying admin (stored encrypted, never
+      sent back to a client):
       <code>claude-opus-5</code> with the server-side
       <code>web_search</code> tool, plus a strict-schema client tool
       <code>submit_proposals</code> the model must call exactly once — schema
       validation happens at the tool-call layer, and structured outputs stay
-      compatible with web search. The prompt carries the current grants digest
-      so the model distinguishes <em>new</em> from <em>update</em>;
+      compatible with web search. The prompt carries the workspace's research
+      profile and the digest of its grants, so the model rates fit and
+      distinguishes <em>new</em> from <em>update</em>;
       <code>pause_turn</code> is handled; a wrong proposal costs one human
       click, not one corrupted row.</p>
       {# Name by name from the MCP registry, not by hand: the hand-written copy
@@ -100,12 +123,12 @@ human has read the diff and clicked approve.
          sentence loses its tail instead of claiming zero tools. #}
       Auth via <code>X-API-Key</code> header or —
       for clients that can't send headers — a capability URL
-      <code>/mcp/k/{key}</code>: a middleware validates the key against the
-      same revocable table and rewrites the path, so the MCP app itself stays
-      auth-unaware. Approval is deliberately absent from every API surface:
+      <code>/mcp/k/{key}</code>: a middleware validates the key, which belongs to a
+      user and reaches what that user's memberships reach, and rewrites the
+      path. Every tool takes a workspace. Approval is deliberately absent from every API surface:
       it exists only as a button in this UI. REST for scripts:
-      <code>GET /ono/grants</code>, a compact dump optimized for LLM context
-      windows.</p>
+      <code>GET /ono/grants?workspace=…</code>, a compact dump optimized for LLM
+      context windows.</p>
     </div>
   </details>
 </div>
